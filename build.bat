@@ -6,7 +6,10 @@
 ECHO Building package-updater...
 
 IF EXIST "%ProgramFiles%\AutoHotkey\Compiler\Ahk2Exe.exe" (
-    RMDIR /S /Q "build"
+    if EXIST "build" (
+        ECHO - Cleaning build environment...
+        RMDIR /S /Q "build" >nul
+    )
     MKDIR "build"
 
     ECHO - Building to 'build' directory...
