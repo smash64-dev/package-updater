@@ -78,7 +78,7 @@ class Package {
 
     ; grab the full path of a directory relative to the base directory
     GetDirectory(path) {
-        fullpath := this.base_directory . "\" . path
+        fullpath := Format("{1}\{2}", this.base_directory, path)
         if InStr(FileExist(fullpath), "D") {
             return fullpath
         }
@@ -89,7 +89,7 @@ class Package {
 
     ; grab the full path of a file relative to the base directory
     GetFile(path) {
-        fullpath := this.base_directory . "\" . path
+        fullpath := Format("{1}\{2}", this.base_directory, path)
         if FileExist(fullpath) {
             return fullpath
         }

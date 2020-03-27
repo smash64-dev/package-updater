@@ -23,8 +23,8 @@ class GitHub {
         this.log := ghlog
 
         if source_repo {
-            all_releases := this.github_api . "/repos/" . source_repo . "/releases"
-            latest_release := all_releases . "/latest"
+            all_releases := Format("{1}/repos/{2}/releases", this.github_api, source_repo)
+            latest_release := Format("{1}/latest", all_releases)
             this.wants_beta := wants_beta
         } else {
             this.log.err("Unable to determine source repo")
@@ -38,14 +38,12 @@ class GitHub {
 
     ; find the checksum and package assets in the latest build
     FindAssets(package, checksum) {
-        this.log.info(Format("Checking for {1} and {2}", package, checksum))
         assets := this.latest_build.assets
         found_checksum := false
         found_package := false
 
         loop {
             asset_name := assets[A_Index].name
-            this.log.info(Format("Asset name is {1}", asset_name))
 
             if InStr(asset_name, checksum) {
                 found_checksum := true

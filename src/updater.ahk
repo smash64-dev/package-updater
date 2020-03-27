@@ -17,13 +17,33 @@ BackupOldPackage(package, save_dir) {
 
 	backup_zip := Format("{1}\backup-{2}-{3}.zip", save_dir, repo[2], now)
 	log.info(Format("Zipping '{1}' to '{2}'", package.base_directory, backup_zip))
-	Zip(package.base_directory, backup_zip)
+	;Zip(package.base_directory, backup_zip)
+
+	; trim old backups to package specification
+	; finds all the backup files, sorts by name (!) and keeps the latest X
+	; TODO: sort by file creation time
+	keep_old := package.updater("Backups")
+	backup_list := ""
+
+	loop %save_dir%\*.* {
+		backup_list := backup_list . "`n" . A_LoopFileName
+	}
+	Sort backup_list, CLR
+	backup_array := StrSplit(backup_list, "`n")
+	backup_array.RemoveAt(1, keep_old)
+
+	for index, backup in backup_array {
+		if backup {
+			log.info(Format("Removing backup file '{1}\{2}'", save_dir, backup))
+			FileDelete, % Format("{1}\{2}", save_dir, backup)
+		}
+	}
 }
 
 ; download and verify the latest release from github
 DownloadLatestRelease(package, github, temp_dir) {
 	; queries the API for the latest release information
-	release_json := temp_dir . "\releases.json"
+	release_json := Format("{1}\{2}.json", temp_dir, package.package("Name"))
 	UrlDownloadToFile % github.release_url, %release_json%
 
 	; find the urls we need to download with
@@ -37,17 +57,17 @@ DownloadLatestRelease(package, github, temp_dir) {
 
 	; download the proper assets
 	if found_assets {
-		; download the checksum file to validate our package
-		SplitPath % github.checksum_url, checksum_filename
-		checksum_path := temp_dir . "\" . checksum_filename
-		UrlDownloadToFile % github.checksum_url, %checksum_path%
-		log.info(Format("Downloaded '{1}' to '{2}' (Result: {3})", github.checksum_url, checksum_path, ErrorLevel))
-
 		; download the full package
 		SplitPath % github.package_url, package_filename
-		package_path := temp_dir . "\" . package_filename
+		package_path := Format("{1}\{2}", temp_dir, package_filename)
 		UrlDownloadToFile % github.package_url, %package_path%
 		log.info(Format("Downloaded '{1}' to '{2}' (Result: {3})", github.package_url, package_path, ErrorLevel))
+		
+		; download the checksum file to validate our package
+		SplitPath % github.checksum_url, checksum_filename
+		checksum_path := Format("{1}\{2}", temp_dir, checksum_filename)
+		UrlDownloadToFile % github.checksum_url, %checksum_path%
+		log.info(Format("Downloaded '{1}' to '{2}' (Result: {3})", github.checksum_url, checksum_path, ErrorLevel))
 	} else {
 		log.err(Format("Unable to find appropriate assets to download from '{1}'", release_json))
 		return false
@@ -85,12 +105,12 @@ ExtractNewPackage(package_path, extract_dir) {
 }
 
 ; entry point
-global self := "project64k-updater"
+global self := "package-updater"
 global log := new Logger("updater.ahk")
 log.verb("=====")
 
-app_dir := A_AppData . "\" . self
-temp_dir := A_Temp . "\" . self
+app_dir := Format("{1}\{2}", A_AppData, self)
+temp_dir := Format("{1}\{2}", A_Temp, self)
 FileCreateDir, %app_dir%
 FileCreateDir, %temp_dir%
 log.info(Format("Created working directories '{1}' and '{2}'", app_dir, temp_dir))
@@ -98,32 +118,31 @@ log.info(Format("Created working directories '{1}' and '{2}'", app_dir, temp_dir
 if A_Args.Length() > 0 {
 	; we were run with arguments, this is likely phase two
 	; replace the current package with the one supplied in the arguments
-	old_pkg := new Package(A_Args[1])
-	new_pkg := new Package(A_ScriptFullPath)
+	old_package := new Package(A_Args[1])
+	new_package := new Package(A_ScriptFullPath)
 
-	log.info(Format("Preparing to update package '{1}' to {2}", old_pkg.package("BaseDir"), new_pkg.package("BaseDir")))
+	log.info(Format("Preparing to update package '{1}' to {2}", old_package.base_directory, new_pkg.base_directory))
 } else {
 	; we were run without arguments, this is likely phase one
 	; download/extract the latest release and backup the current package
 	current_package := new Package(A_ScriptFullPath)
 	github := new GitHub(current_package.updater("Source"), current_package.updater("Beta"))
 
-	latest_package := DownloadLatestRelease(current_package, github, temp_dir)
-	latest_directory := temp_dir . "\latest"
+	latest_release := DownloadLatestRelease(current_package, github, temp_dir)
+	latest_directory := Format("{1}\{2}-latest", temp_dir, current_package.package("Name"))
 
-	if latest_package {
+	if latest_release {
 		BackupOldPackage(current_package, app_dir)
-		ExtractNewPackage(latest_package, latest_directory)
+		ExtractNewPackage(latest_release, latest_directory)
 
-		latest_updater := latest_directory . "\" . current_package.updater("Updater", "Tools\updater.exe")
-		latest_pkg := new Package(latest_updater)
+		latest_updater := Format("{1}\{2}", latest_directory, current_package.updater("Updater", "package-updater.exe"))
+		latest_package := new Package(latest_updater)
 		log.info(Format("Validating latest package by checking for '{1}'", latest_updater))
 
-		; the object seemed to process well enough, proceed to phase 2
-		if FileExist(latest_pkg.package("Updater")) {
-			log.info("Latest package seems good!")
-			;Run, latest_pkg.package("Updater"), current_package.package("Updater")
-			Run, % current_package.package("Updater") . " " . current_package.Package("Updater")
+		; the latest package parsed, run that updater
+		if latest_package {
+			Process, Close, % current_package.package("Process")
+			Run, % latest_package.updater("Updater") . " " . current_package.updater("Updater")
 		}
 	}
 }
