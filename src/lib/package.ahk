@@ -4,51 +4,37 @@
 #Include %A_LineFile%\..\json.ahk
 
 class Package {
-    static cfg_list := ["Cfg\tools.ini", "Config\tools.ini"]
-    static exe_list := ["project64.exe", "project64k.exe", "project64kse.exe", "project64kve.exe"]
     static log := {}
-    static reserved := {base_directory:true, config_tools_ini:true, exe_list:true, project64_exe:true, updater_binary:true}
+    static reserved := {base_directory:true, updater_binary:true, updater_config:true}
 
     base_directory := ""
-    config_tools_ini := ""
-    project64_exe := ""
-    updater_binary := ""
-
-    ; we will probably access these directly
     config_data := {}
     config_func := {}
     config_json := ""
+    updater_binary := ""
+    updater_config := ""
 
-    __New(updater_binary) {
+    __New(updater_binary, config := "") {
         plog := new Logger("package.ahk")
         this.log := plog
 
         this.updater_binary := updater_binary
-        this.base_directory := this.GetBaseDirectory(this.updater_binary)
+        SplitPath, updater_binary,, binary_path
+        this.updater_config := updater_config != "" ? updater_config : binary_path . "\updater.cfg"
 
-        for index, config in Package.cfg_list {
-            file := this.GetFile(config)
-
-            if file {
-                this.config_tools_ini := file
-                break
-            }
-        }
-
-        ; store our basic information into the config data
-        this.config_data["Package"] := {"BaseDir": this.base_directory, "Config": this.config_tools_ini, "Project64": this.project64_exe, "Updater": this.updater_binary}
-        this.config_func["Package"] := true
-
-        if this.config_tools_ini {
+        if FileExist(this.updater_config) {
+            this.log.info(this.updater_config)
             ; read through the entire config and turn it into an object
-            IniRead, tools_sections, % this.config_tools_ini
+            IniRead, tools_sections, % this.updater_config
 
             loop, parse, tools_sections, `n, `r
             {
+                ; help build the object better
                 tools_section := A_LoopField
                 this.config_func[tools_section] := true
                 this.config_data[tools_section] := {}
-                IniRead, section_keys, % this.config_tools_ini, %tools_section%
+
+                IniRead, section_keys, % this.updater_config, %tools_section%
 
                 loop, parse, section_keys, `n, `r
                 {
@@ -59,49 +45,35 @@ class Package {
                     this.config_data[tools_section][key] := value
                 }
             }
+        } else {
+            this.log.err(Format("Unable to find config file '{1}'", this.updater_config))
+            return false
         }
 
+        this.base_directory := this.__GetBaseDirectory(this.updater_binary, this.config_data["Package"]["Process"])
         this.config_json := JSON.Dump(this.config_data)
+
         this.log.info(Format("config_json: '{1}'", this.config_json))
     }
 
     ; allows pull from different section of the config easier
     __Call(method, ByRef arg, args*) {
         if this.config_func[method]
-            return this.GetSectionValue(method, arg, args*)
+            return this.__GetSectionValue(method, arg, args*)
     }
 
     ; allows using directory paths or filenames as properties
     __Get(path) {
-        if ! Package.reserved[path]
-            return this.GetDirectory(StrReplace(path, "_", "\"))
-        else
+        if ! Package.reserved[path] {
+            directory := this.GetDirectory(StrReplace(path, "_", "\"))
+
+            if directory
+                return directory
+            else
+                return this.GetFile(StrReplace(path, "_", "\"))
+        } else {
             return this.path
-    }
-
-    ; grab the base directory of the package, "project64*.exe"
-    GetBaseDirectory(updater) {
-        ; FileExist works off A_WorkingDir, don't destroy that
-        B_WorkingDir = %A_WorkingDir%
-        SplitPath, updater,, current_dir
-        
-        ; we shouldn't be more than 5 subdirectories deep anyway
-        loop, 5 {
-            SetWorkingDir, %current_dir%
-
-            for index, exe in Package.exe_list {
-                if FileExist(exe) {
-                    SetWorkingDir %B_WorkingDir%
-                    this.project64_exe := current_dir . "\" . exe
-                    return current_dir
-                }
-            }
-
-            SplitPath, A_WorkingDir,, current_dir
         }
-
-        this.log.err("Unable to find base directory")
-        return false
     }
 
     ; grab the full path of a directory relative to the base directory
@@ -126,8 +98,29 @@ class Package {
         return false
     }
 
+    __GetBaseDirectory(updater_binary, package_binary) {
+        ; FileExist works off A_WorkingDir, don't destroy that
+        B_WorkingDir = %A_WorkingDir%
+        SplitPath, updater_binary,, current_dir
+        
+        ; we shouldn't be more than 5 subdirectories deep anyway
+        loop, 5 {
+            SetWorkingDir, %current_dir%
+
+            if FileExist(package_binary) {
+                SetWorkingDir %B_WorkingDir%
+                return current_dir
+            }
+
+            SplitPath, A_WorkingDir,, current_dir
+        }
+
+        this.log.err("Unable to determine base directory")
+        return false
+    }
+
     ; grab values from the config, with an optional default 
-    GetSectionValue(sec, key, default_value := "") {
+    __GetSectionValue(sec, key, default_value := "") {
         if this.config_data[sec].HasKey(key)
             return this.config_data[sec][key]
         else

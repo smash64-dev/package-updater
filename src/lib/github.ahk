@@ -22,61 +22,53 @@ class GitHub {
         ghlog := new Logger("github.ahk")
         this.log := ghlog
 
-        all_releases := this.github_api . "/repos/" . source_repo . "/releases"
-        latest_release := all_releases . "/latest"
-        this.wants_beta := wants_beta
+        if source_repo {
+            all_releases := this.github_api . "/repos/" . source_repo . "/releases"
+            latest_release := all_releases . "/latest"
+            this.wants_beta := wants_beta
+        } else {
+            this.log.err("Unable to determine source repo")
+            return false
+        }
 
         ; if no beta, then just pull the latest release
         this.release_url := wants_beta ? all_releases : latest_release
         this.log.info(Format("release_url: {1} (beta: {2})", this.release_url, this.wants_beta))
     }
 
-    ; returns the array id of the latest build from the JSON data
-    FindLatestBuildId() {
-        build_list := {}
-        build_tags := ""
-
-        loop {
-            tag_name := this.json_payload[A_Index].tag_name
-            build_list[tag_name] := A_Index
-            build_tags := build_tags . "`n" . tag_name
-        } until !this.json_payload[A_Index].id
-
-        Sort build_tags, CLR
-        builds_array := StrSplit(build_tags, "`n")
-        latest_id := builds_array[1]
-
-        return build_list[latest_id]
-    }
-
     ; find the checksum and package assets in the latest build
-    FindAssets() {
+    FindAssets(package, checksum) {
+        this.log.info(Format("Checking for {1} and {2}", package, checksum))
         assets := this.latest_build.assets
         found_checksum := false
         found_package := false
 
         loop {
-            asset_name := assets[A_Index].name 
+            asset_name := assets[A_Index].name
+            this.log.info(Format("Asset name is {1}", asset_name))
 
-            if InStr(asset_name, "md5sum") {
+            if InStr(asset_name, checksum) {
                 found_checksum := true
-                this.checksum_type := "MD5"
                 this.checksum_url := assets[A_Index].browser_download_url
             }
 
-            if InStr(asset_name, "sha1sum") {
-                found_checksum := true
-                this.checksum_type := "SHA"
-                this.checksum_url := assets[A_Index].browser_download_url
-            }
-
-            if InStr(asset_name, "zip") {
+            if InStr(asset_name, package) {
                 found_package := true
                 this.package_url := assets[A_Index].browser_download_url
             }
         } until !assets[A_Index].id
 
-        return found_checksum & found_package
+        if ! found_checksum {
+            this.log.err(Format("Unable to find checksum '{1}' in assets", checksum))
+            return false
+        }
+
+        if ! found_package {
+            this.log.err(Format("Unable to find package '{1}' in asssets", checksum))
+            return false
+        }
+
+        return true
     }
 
     ; load the API results into a JSON object
@@ -87,7 +79,7 @@ class GitHub {
             if json_str {
                 if this.wants_beta {
                     this.json_payload := JSON.Load(json_str)
-                    this.latest_build_id := this.FindLatestBuildId()
+                    this.latest_build_id := this.__FindLatestBuildId()
                 } else {
                     ; wrap the single release into an array to work better in other functions
                     this.json_payload := JSON.Load("[" . json_str . "]")
@@ -105,5 +97,23 @@ class GitHub {
         }
 
         return true
+    }
+
+    ; returns the array id of the latest build from the JSON data
+    __FindLatestBuildId() {
+        build_list := {}
+        build_tags := ""
+
+        loop {
+            tag_name := this.json_payload[A_Index].tag_name
+            build_list[tag_name] := A_Index
+            build_tags := build_tags . "`n" . tag_name
+        } until !this.json_payload[A_Index].id
+
+        Sort build_tags, CLR
+        builds_array := StrSplit(build_tags, "`n")
+        latest_id := builds_array[1]
+
+        return build_list[latest_id]
     }
 }

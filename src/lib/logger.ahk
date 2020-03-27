@@ -12,11 +12,11 @@ class Logger {
     ; allows calling different log levels from the object
     __Call(method, ByRef arg, args*) {
         if Logger.loglevels[method]
-            return this.logger(Logger.loglevels[method], arg, args*)
+            return this.__logger(Logger.loglevels[method], arg, args*)
     }
 
     ; log message to DebugView (https://docs.microsoft.com/en-us/sysinternals/downloads/debugview)
-    logger(level, message := "") {
+    __logger(level, message := "") {
         ; don't log on release builds
         ;is_compiled := A_IsCompiled
         is_compiled := false

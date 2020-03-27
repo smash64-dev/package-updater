@@ -14,15 +14,14 @@ BackupOldPackage(package, save_dir) {
 	FormatTime, now,, yyyy-MM-dd-HHmmss
 	source := package.updater("Source")
 	repo := StrSplit(source, "/")
-	version := package.meta("Version")
 
-	backup_zip := Format("{1}\backup-{2}-v{3}-{4}.zip", save_dir, repo[2], version, now)
+	backup_zip := Format("{1}\backup-{2}-{3}.zip", save_dir, repo[2], now)
 	log.info(Format("Zipping '{1}' to '{2}'", package.base_directory, backup_zip))
 	Zip(package.base_directory, backup_zip)
 }
 
 ; download and verify the latest release from github
-DownloadLatestRelease(github, temp_dir) {
+DownloadLatestRelease(package, github, temp_dir) {
 	; queries the API for the latest release information
 	release_json := temp_dir . "\releases.json"
 	UrlDownloadToFile % github.release_url, %release_json%
@@ -30,7 +29,7 @@ DownloadLatestRelease(github, temp_dir) {
 	; find the urls we need to download with
 	found_release := github.LoadJSON(release_json)
 	if found_release {
-		found_assets := github.FindAssets()
+		found_assets := github.FindAssets(package.updater("PackageFile"), package.updater("ChecksumFile"))
 	} else {
 		log.err(Format("Unable to find proper release data in '{1}'", release_json))
 		return false
@@ -106,25 +105,25 @@ if A_Args.Length() > 0 {
 } else {
 	; we were run without arguments, this is likely phase one
 	; download/extract the latest release and backup the current package
-	current_pkg := new Package(A_ScriptFullPath)
-	github := new GitHub(current_pkg.updater("Source"), current_pkg.updater("Beta", true))
+	current_package := new Package(A_ScriptFullPath)
+	github := new GitHub(current_package.updater("Source"), current_package.updater("Beta"))
 
-	latest_package := DownloadLatestRelease(github, temp_dir)
+	latest_package := DownloadLatestRelease(current_package, github, temp_dir)
 	latest_directory := temp_dir . "\latest"
 
 	if latest_package {
-		BackupOldPackage(current_pkg, app_dir)
+		BackupOldPackage(current_package, app_dir)
 		ExtractNewPackage(latest_package, latest_directory)
 
-		latest_updater := latest_directory . "\" . current_pkg.updater("Updater", "Tools\updater.exe")
+		latest_updater := latest_directory . "\" . current_package.updater("Updater", "Tools\updater.exe")
 		latest_pkg := new Package(latest_updater)
 		log.info(Format("Validating latest package by checking for '{1}'", latest_updater))
 
 		; the object seemed to process well enough, proceed to phase 2
 		if FileExist(latest_pkg.package("Updater")) {
 			log.info("Latest package seems good!")
-			;Run, latest_pkg.package("Updater"), current_pkg.package("Updater")
-			Run, % current_pkg.package("Updater") . " " . current_pkg.Package("Updater")
+			;Run, latest_pkg.package("Updater"), current_package.package("Updater")
+			Run, % current_package.package("Updater") . " " . current_package.Package("Updater")
 		}
 	}
 }
