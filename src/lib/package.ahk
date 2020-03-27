@@ -164,15 +164,15 @@ class Package {
     }
 
     ; grab values from the config
-    __GetSectionValue(sec, key, optional := false) {
+    __GetSectionValue(sec, key, optional := "") {
         if this.config_data[sec].HasKey(key) {
             return this.config_data[sec][key]
         } else {
-            if optional {
-                this.log.warn(Format("[{1}]{2} was not found, but value is optional", sec, key))
-                return ""
+            if (optional != "") {
+                this.log.warn(Format("'{2}' was not found in [{1}] was not found, returning '{3}'", sec, key, optional))
+                return optional
             } else {
-                this.log.err(Format("[{1}]{2} was not found", sec, key))
+                this.log.err(Format("'{2}' was not found in [{1}] was not found, field required", sec, key))
                 return false
             }
         }

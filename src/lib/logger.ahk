@@ -17,7 +17,6 @@ class Logger {
 
     ; log message to DebugView (https://docs.microsoft.com/en-us/sysinternals/downloads/debugview)
     __logger(level, message := "") {
-        ; don't log on release builds
         ;is_compiled := A_IsCompiled
         is_compiled := false
 
