@@ -1,7 +1,8 @@
 ; package.ahk
 
 #Include %A_LineFile%\..\logger.ahk
-#Include %A_LineFile%\..\json.ahk
+#Include %A_LineFile%\..\..\ext\json.ahk
+#Include %A_LineFile%\..\..\ext\zip.ahk
 
 class Package {
     static log := {}
@@ -23,7 +24,6 @@ class Package {
         this.updater_config := updater_config != "" ? updater_config : binary_path . "\updater.cfg"
 
         if FileExist(this.updater_config) {
-            this.log.info(this.updater_config)
             ; read through the entire config and turn it into an object
             IniRead, tools_sections, % this.updater_config
 
@@ -76,6 +76,36 @@ class Package {
         }
     }
 
+    ; backs up package to a directory, with the option to trim old backups
+    Backup(directory, keep_old := 0) {
+        FormatTime, now,, yyyy-MM-dd-HHmmss
+        backup_zip := Format("{1}\backup-{2}-{3}.zip", directory, this.config_data["Package"]["Name"], now)
+        
+        this.log.info(Format("Zipping '{1}' to '{2}'", this.base_directory, backup_zip))
+        Zip(this.base_directory, backup_zip)
+
+        ; trim old backups if specified
+        if (keep_old > 0) {
+            backup_list := ""
+
+            loop %save_dir%\*.*
+            {
+                backup_list := backup_list . "`n" . A_LoopFileName
+            }
+
+            Sort backup_list, CLR
+            backup_array := StrSplit(backup_list, "`n")
+            backup_array.RemoveAt(1, keep_old)
+
+            for index, backup in backup_array {
+                if backup {
+                    log.verb(Format("Removing backup file '{1}\{2}'", directory, backup))
+                    FileDelete, % Format("{1}\{2}", directory, backup)
+                }
+            }
+        }
+    }
+
     ; grab the full path of a directory relative to the base directory
     GetDirectory(path) {
         fullpath := Format("{1}\{2}", this.base_directory, path)
@@ -96,6 +126,20 @@ class Package {
 
         this.log.warn(Format("File '{1}' does not exist", fullpath))
         return false
+    }
+
+    ; returns an object of special paths
+    GetWatchPaths() {
+        watch_hash := {}
+
+        for key, value in this.config_data {
+            if RegExMatch(key, "^Watch_") {
+                path := this.config_data[key]["Path"]
+                watch_hash[path] := key
+            }
+        }
+
+        return watch_hash
     }
 
     __GetBaseDirectory(updater_binary, package_binary) {
@@ -119,11 +163,18 @@ class Package {
         return false
     }
 
-    ; grab values from the config, with an optional default 
-    __GetSectionValue(sec, key, default_value := "") {
-        if this.config_data[sec].HasKey(key)
+    ; grab values from the config
+    __GetSectionValue(sec, key, optional := false) {
+        if this.config_data[sec].HasKey(key) {
             return this.config_data[sec][key]
-        else
-            return default_value
+        } else {
+            if optional {
+                this.log.warn(Format("[{1}]{2} was not found, but value is optional", sec, key))
+                return ""
+            } else {
+                this.log.err(Format("[{1}]{2} was not found", sec, key))
+                return false
+            }
+        }
     }
 }

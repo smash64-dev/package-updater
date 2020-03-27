@@ -1,33 +1,33 @@
 ; github.ahk
 
 #Include %A_LineFile%\..\logger.ahk
-#Include %A_LineFile%\..\json.ahk
+#Include %A_LineFile%\..\..\ext\json.ahk
 
 class GitHub {
     static ghlog := {}
     
-    checksum_type := "SHA"
     github_api := "https://api.github.com"
+    github_owner := ""
+    github_repo := ""
     json_payload := ""
+    latest_build := {}
     latest_build_id := 1
+    release_url := ""
     wants_beta := false
 
-    ; we will probably access these directly
-    checksum_url := ""
-    latest_build := {}
-    package_url := ""
-    release_url := ""
-
-    __New(source_repo, wants_beta) {
+    __New(github_owner, github_repo, wants_beta) {
         ghlog := new Logger("github.ahk")
         this.log := ghlog
 
-        if source_repo {
-            all_releases := Format("{1}/repos/{2}/releases", this.github_api, source_repo)
+        if github_owner and github_repo {
+            all_releases := Format("{1}/repos/{2}/{3}/releases", this.github_api, github_owner, github_repo)
             latest_release := Format("{1}/latest", all_releases)
+
+            this.github_owner := github_owner
+            this.github_repo := github_repo
             this.wants_beta := wants_beta
         } else {
-            this.log.err("Unable to determine source repo")
+            this.log.err(Format("Unable to determine release_url: '{1}' '{2}' (beta: {3})", github_owner, github_repo, wants_beta))
             return false
         }
 
@@ -36,69 +36,39 @@ class GitHub {
         this.log.info(Format("release_url: {1} (beta: {2})", this.release_url, this.wants_beta))
     }
 
-    ; find the checksum and package assets in the latest build
-    FindAssets(package, checksum) {
+    ; find an asset url from an asset name
+    GetFileURL(file_name) {
         assets := this.latest_build.assets
-        found_checksum := false
-        found_package := false
 
         loop {
-            asset_name := assets[A_Index].name
+            current_name := assets[A_Index].name
 
-            if InStr(asset_name, checksum) {
-                found_checksum := true
-                this.checksum_url := assets[A_Index].browser_download_url
-            }
-
-            if InStr(asset_name, package) {
-                found_package := true
-                this.package_url := assets[A_Index].browser_download_url
+            if InStr(current_name, file_name) {
+                asset_url := assets[A_Index].browser_download_url
+                this.log.info(Format("Asset '{1}' url found: '{2}'", file_name, asset_url))
+                return asset_url
             }
         } until !assets[A_Index].id
 
-        if ! found_checksum {
-            this.log.err(Format("Unable to find checksum '{1}' in assets", checksum))
-            return false
-        }
-
-        if ! found_package {
-            this.log.err(Format("Unable to find package '{1}' in asssets", checksum))
-            return false
-        }
-
-        return true
+        this.log.err(Format("Unable to find '{1}' in assets", file_name))
+        return false
     }
 
-    ; load the API results into a JSON object
-    LoadJSON(json_file) {
-        if FileExist(json_file) {
-            FileRead, json_str, %json_file%
+    GetReleases(directory) {
+        release_json := Format("{1}\{2}-{3}.json", directory, this.github_owner, this.github_repo)
+        UrlDownloadToFile % this.release_url, % release_json
 
-            if json_str {
-                if this.wants_beta {
-                    this.json_payload := JSON.Load(json_str)
-                    this.latest_build_id := this.__FindLatestBuildId()
-                } else {
-                    ; wrap the single release into an array to work better in other functions
-                    this.json_payload := JSON.Load("[" . json_str . "]")
-                    this.latest_build_id := 1
-                }
-
-                this.latest_build := this.json_payload[this.latest_build_id]
-            } else {
-                this.log.err(Format("Could not read json file '{1}'", json_file))
-                return false
-            }
+        if ! ErrorLevel {
+            this.log.verb(Format("Downloaded '{1}'", this.release_url))
+            return this.__LoadJSON(release_json)
         } else {
-            this.log.err(Format("Unable to find json file '{1}'", json_file))
+            this.log.err(Format("There was an error getting latest releases from '{1}'", release_json))
             return false
         }
-
-        return true
     }
 
     ; returns the array id of the latest build from the JSON data
-    __FindLatestBuildId() {
+    __GetLatestBuildId() {
         build_list := {}
         build_tags := ""
 
@@ -113,5 +83,37 @@ class GitHub {
         latest_id := builds_array[1]
 
         return build_list[latest_id]
+    }
+
+    ; load the API results into a JSON object
+    __LoadJSON(json_file) {
+        if FileExist(json_file) {
+            FileRead, json_str, %json_file%
+
+            if json_str {
+                try {
+                    if this.wants_beta {
+                        this.json_payload := JSON.Load(json_str)
+                        this.latest_build_id := this.__GetLatestBuildId()
+                    } else {
+                        this.json_payload := JSON.Load("[" . json_str . "]")
+                        this.latest_build_id := 1
+                    }
+                } catch e {
+                    this.log.err("Unable to read JSON data: {1}", e)
+                    return false
+                }
+
+                this.latest_build := this.json_payload[this.latest_build_id]
+            } else {
+                this.log.err(Format("Could not read JSON file '{1}'", json_file))
+                return false
+            }
+        } else {
+            this.log.err(Format("Unable to find JSON file '{1}'", json_file))
+            return false
+        }
+
+        return true
     }
 }
