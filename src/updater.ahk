@@ -104,9 +104,9 @@ FileCreateDir % temp_directory
 log.info(Format("Created working temp directory '{1}' ({2})", temp_directory, ErrorLevel))
 
 switch A_Args[1] {
-	case "":			GetLatestPackage(A_ScriptFullPath)
-	case "version":		ShowVersionInformation()
-	default:			SetLatestPackage(A_Args[1], A_ScriptFullPath)
+	case "":	GetLatestPackage(A_ScriptFullPath)
+	case "-v":	ShowVersionInformation()
+	default:	SetLatestPackage(A_Args[1], A_ScriptFullPath)
 }
 
 exit
