@@ -2,11 +2,19 @@
 
 class Logger {
     ; helps build methods like log.crit() and log.warn()
-    static loglevels := {crit:"C", err:"E", warn:"W", info:"I", verb:"V"}
-    tag := ""
+    static loglevels := {crit: [1, "C"], err:[2, "E"], warn:[3, "W"], info:[4, "I"], verb:[5, "V"], debug:[6, "D"]}
 
-    __New(tag:="") {
+    tag := ""
+    verbosity := 4
+
+    __New(tag := "") {
         this.tag := tag ? tag : A_ScriptName
+        is_compiled := A_IsCompiled
+
+        ; have a different verbosity level when compiled
+        if is_compiled {
+            this.verbosity := 5
+        }
     }
 
     ; allows calling different log levels from the object
@@ -16,11 +24,8 @@ class Logger {
     }
 
     ; log message to DebugView (https://docs.microsoft.com/en-us/sysinternals/downloads/debugview)
-    __logger(level, message := "") {
-        ;is_compiled := A_IsCompiled
-        is_compiled := false
-
-        if ! is_compiled
-            OutputDebug % Format("| {1} | {2} | {3}", level, this.tag, message)
+    __logger(level, message := "", args*) {
+        if level[1] <= this.verbosity
+            OutputDebug % Format("| {1} | {2} | {3}", level[2], this.tag, Format(message, args*))
     }
 }

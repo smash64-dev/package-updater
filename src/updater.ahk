@@ -7,6 +7,9 @@ global SELF := "package-updater"
 global VERSION := "1.0.0"
 global log := new Logger("updater.ahk")
 
+global app_directory := Format("{1}\{2}", A_AppData, SELF)
+global temp_directory := Format("{1}\{2}", A_Temp, SELF)
+
 ; download and verify the latest release from github
 DownloadLatestPackage(package, github, temp_dir) {
 	found_release := github.GetReleases(temp_dir)
@@ -21,11 +24,11 @@ DownloadLatestPackage(package, github, temp_dir) {
 		if FileExist(asset_location) {
 			return asset_location
 		} else {
-			log.warn(Format("Unable to find asset '{1}'", asset_location))
+			log.warn("Unable to find asset '{1}'", asset_location)
 			return false
 		}
 	} else {
-		log.err(Format("Unable to find proper release data in '{1}'", release_json))
+		log.err("Unable to find proper release data in '{1}'", release_json)
 		return false
 	}
 }
@@ -51,16 +54,16 @@ GetLatestPackage(old_updater) {
 			new_package := new Package(new_updater)
 
 			if kill_process and new_package {
-				log.info(Format("Killing process from package '{1}'", kill_process))
+				log.info("Killing process from package '{1}'", kill_process)
 				Process, Close, % kill_process
 
-				log.info(Format("Executing new updater: '{1} '{2}''", new_updater, old_updater))
+				log.info("Executing new updater: '{1} '{2}''", new_updater, old_updater)
 				Run %new_updater% "%old_updater%"
 
 				return true
 			}
 		} else {
-			log.err(Format("Unable to find updater in '{1}'", latest_directory))
+			log.err("Unable to find updater in '{1}'", latest_directory)
 			return false
 		}
 	}
@@ -74,13 +77,26 @@ SetLatestPackage(old_updater, new_updater) {
 	old_package := new Package(old_updater)
 	new_package := new Package(new_updater)
 
-	log.info(Format("Preparing to transfer package from '{1}' to {2}", new_package.base_directory, old_package.base_directory))
+	log.info("Preparing to transfer package from '{1}' to '{2}'", new_package.base_directory, old_package.base_directory)
 	transfer := new Transfer(new_package.base_directory, old_package.base_directory)
 
 	if transfer {
-		watch_paths := new_package.GetWatchPaths()
-		transfer.DoBasicFiles(watch_paths)
-		transfer.DoComplexFile(new_package.config_data["Watch_Kaillera"])
+		complex_paths := new_package.GetComplexPaths()
+		transfer.BasicFiles(complex_paths)
+
+		for complex, action in new_package.GetComplexKeys() {
+			complex_data := new_package.config_data[complex]
+			result := transfer.ComplexFile(complex_data, action)
+			log.info("Performed '{1}' on '{2}' (result: {3})", action, complex_data["Path"], result)
+		}
+
+		;rdb := new IniConfig(Format("{1}\Plugin\GLideN64.custom.ini", new_package.base_directory))
+		rdb := new IniConfig(Format("{1}\Project64.rdb", new_package.base_directory))
+		new_rdb := new IniConfig(Format("{1}\Tools\smash.rdb", new_package.base_directory))
+		rm_rdb := new IniConfig(Format("{1}\Tools\smash-remove.rdb", new_package.base_directory))
+
+		log.info(rdb.SetData(new_rdb, 0, 1))
+		log.info(rdb.SetData(rm_rdb, 1, 1))
 	}
 }
 
@@ -91,18 +107,19 @@ ShowVersionInformation() {
 }
 
 ; entry point
-log.verb("===================================")
-log.verb(Format("= {1} (v{2})", SELF, VERSION))
-log.verb("===================================")
+log.info("===================================")
+log.info("= {1} (v{2})", SELF, VERSION)
+log.info("===================================")
 
-global app_directory := Format("{1}\{2}", A_AppData, SELF)
-FileCreateDir % app_directory
-log.info(Format("Created working app directory '{1}' ({2})", app_directory, ErrorLevel))
+; create base working directories if they don't exist
+for index, dir in [app_directory, temp_directory] {
+	if ! InStr(FileExist(dir), "D") {
+		FileCreateDir % dir
+		log.verb("Created working temp directory '{1}' (error: {2})", dir, A_LastError)
+	}
+}
 
-global temp_directory := Format("{1}\{2}", A_Temp, SELF)
-FileCreateDir % temp_directory
-log.info(Format("Created working temp directory '{1}' ({2})", temp_directory, ErrorLevel))
-
+; handle arguments
 switch A_Args[1] {
 	case "":	GetLatestPackage(A_ScriptFullPath)
 	case "-v":	ShowVersionInformation()

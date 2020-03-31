@@ -1,5 +1,6 @@
 ; package.ahk
 
+#Include %A_LineFile%\..\ini_config.ahk
 #Include %A_LineFile%\..\logger.ahk
 #Include %A_LineFile%\..\..\ext\json.ahk
 #Include %A_LineFile%\..\..\ext\zip.ahk
@@ -9,6 +10,7 @@ class Package {
     static reserved := {base_directory:true, updater_binary:true, updater_config:true}
 
     base_directory := ""
+    complex_regex := "^Ensure_"
     config_data := {}
     config_func := {}
     config_json := ""
@@ -21,39 +23,19 @@ class Package {
 
         this.updater_binary := updater_binary
         SplitPath, updater_binary,, binary_path
-        this.updater_config := updater_config != "" ? updater_config : binary_path . "\updater.cfg"
+        this.updater_config := updater_config != "" ? updater_config : Format("{1}\updater.cfg", binary_path)
 
-        if FileExist(this.updater_config) {
-            ; read through the entire config and turn it into an object
-            IniRead, tools_sections, % this.updater_config
+        ini_config := new IniConfig(this.updater_config)
+        this.config_data := ini_config.GetData()
 
-            loop, parse, tools_sections, `n, `r
-            {
-                ; help build the object better
-                tools_section := A_LoopField
-                this.config_func[tools_section] := true
-                this.config_data[tools_section] := {}
-
-                IniRead, section_keys, % this.updater_config, %tools_section%
-
-                loop, parse, section_keys, `n, `r
-                {
-                    section_key := StrSplit(A_LoopField, "=")
-                    key := Trim(section_key[1])
-                    value := Trim(section_key[2])
-
-                    this.config_data[tools_section][key] := value
-                }
-            }
-        } else {
-            this.log.err(Format("Unable to find config file '{1}'", this.updater_config))
-            return false
+        ; HACK: useful for __Call
+        for index, ini_section in ini_config.GetSections() {
+            this.config_func[ini_section] := true
         }
 
         this.base_directory := this.__GetBaseDirectory(this.updater_binary, this.config_data["Package"]["Process"])
         this.config_json := JSON.Dump(this.config_data)
-
-        this.log.info(Format("config_json: '{1}'", this.config_json))
+        this.log.info("config_json: '{1}'", this.config_json)
     }
 
     ; allows pull from different section of the config easier
@@ -81,7 +63,7 @@ class Package {
         FormatTime, now,, yyyy-MM-dd-HHmmss
         backup_zip := Format("{1}\backup-{2}-{3}.zip", directory, this.config_data["Package"]["Name"], now)
         
-        this.log.info(Format("Zipping '{1}' to '{2}'", this.base_directory, backup_zip))
+        this.log.info("Backing up '{1}' to '{2}'", this.base_directory, backup_zip)
         Zip(this.base_directory, backup_zip)
 
         ; trim old backups if specified
@@ -99,11 +81,38 @@ class Package {
 
             for index, backup in backup_array {
                 if backup {
-                    log.verb(Format("Removing backup file '{1}\{2}'", directory, backup))
+                    log.verb("Removing backup file '{1}\{2}'", directory, backup)
                     FileDelete, % Format("{1}\{2}", directory, backup)
                 }
             }
         }
+    }
+
+    GetComplexKeys() {
+        complex_hash := {}
+
+        for key, value in this.config_data {
+            if RegExMatch(key, this.complex_regex) {
+                action := this.config_data[key]["Ensure"]
+                complex_hash[key] := action
+            }
+        }
+
+        return complex_hash
+    }
+
+    ; returns an object of special paths
+    GetComplexPaths() {
+        complex_hash := {}
+
+        for key, value in this.config_data {
+            if RegExMatch(key, this.complex_regex) {
+                path := this.config_data[key]["Path"]
+                complex_hash[path] := key
+            }
+        }
+
+        return complex_hash
     }
 
     ; grab the full path of a directory relative to the base directory
@@ -113,7 +122,7 @@ class Package {
             return fullpath
         }
 
-        this.log.warn(Format("Directory '{1}' does not exist", fullpath))
+        this.log.warn("Directory '{1}' does not exist", fullpath)
         return false
     }
 
@@ -124,22 +133,8 @@ class Package {
             return fullpath
         }
 
-        this.log.warn(Format("File '{1}' does not exist", fullpath))
+        this.log.warn("File '{1}' does not exist", fullpath)
         return false
-    }
-
-    ; returns an object of special paths
-    GetWatchPaths() {
-        watch_hash := {}
-
-        for key, value in this.config_data {
-            if RegExMatch(key, "^Watch_") {
-                path := this.config_data[key]["Path"]
-                watch_hash[path] := key
-            }
-        }
-
-        return watch_hash
     }
 
     __GetBaseDirectory(updater_binary, package_binary) {
@@ -159,20 +154,21 @@ class Package {
             SplitPath, A_WorkingDir,, current_dir
         }
 
-        this.log.err("Unable to determine base directory")
+        this.log.err("Unable to determine base directory from '{1}'", updater_binary)
         return false
     }
 
-    ; grab values from the config
-    __GetSectionValue(sec, key, optional := "") {
-        if this.config_data[sec].HasKey(key) {
-            return this.config_data[sec][key]
+    ; grab values from the config, using this instead of something from IniConfig
+    ; because we're using this directly in __Call to do object magic
+    __GetSectionValue(section_name, key_name, optional := "") {
+        if this.config_data[section_name].Haskey(key_name) {
+            return this.config_data[section_name][key_name]
         } else {
             if (optional != "") {
-                this.log.warn(Format("'{2}' was not found in [{1}] was not found, returning '{3}'", sec, key, optional))
+                this.log.warn("'{2}' was not found in [{1}] was not found, returning '{3}'", section_name, key_name, optional)
                 return optional
             } else {
-                this.log.err(Format("'{2}' was not found in [{1}] was not found, field required", sec, key))
+                this.log.err("'{2}' was not found in [{1}] was not found, field required", section_name, key_name)
                 return false
             }
         }

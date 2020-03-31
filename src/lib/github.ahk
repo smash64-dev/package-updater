@@ -27,13 +27,13 @@ class GitHub {
             this.github_repo := github_repo
             this.wants_beta := wants_beta
         } else {
-            this.log.err(Format("Unable to determine release_url: '{1}' '{2}' (beta: {3})", github_owner, github_repo, wants_beta))
+            this.log.err("Unable to determine release_url: '{1}' '{2}' (beta: {3})", github_owner, github_repo, wants_beta)
             return false
         }
 
         ; if no beta, then just pull the latest release
         this.release_url := wants_beta ? all_releases : latest_release
-        this.log.info(Format("release_url: {1} (beta: {2})", this.release_url, this.wants_beta))
+        this.log.info("release_url: '{1}' (beta: {2})", this.release_url, this.wants_beta)
     }
 
     ; find an asset url from an asset name
@@ -45,24 +45,43 @@ class GitHub {
 
             if InStr(current_name, file_name) {
                 asset_url := assets[A_Index].browser_download_url
-                this.log.info(Format("Asset '{1}' url found: '{2}'", file_name, asset_url))
+                this.log.verb("Asset '{1}' url found: '{2}'", file_name, asset_url)
                 return asset_url
             }
         } until !assets[A_Index].id
 
-        this.log.err(Format("Unable to find '{1}' in assets", file_name))
+        this.log.err("Unable to find '{1}' in assets", file_name)
         return false
     }
 
     GetReleases(directory) {
         release_json := Format("{1}\{2}-{3}.json", directory, this.github_owner, this.github_repo)
         UrlDownloadToFile % this.release_url, % release_json
+        result := A_LastError
 
-        if ! ErrorLevel {
-            this.log.verb(Format("Downloaded '{1}'", this.release_url))
+        if ! A_LastError {
+            this.log.verb("Downloaded '{1}' to '{2}'", this.release_url, directory)
+            FileRead release_data, % release_json
+            this.log.debug("release_json: '{1}'", release_data)
+
             return this.__LoadJSON(release_json)
         } else {
-            this.log.err(Format("There was an error getting latest releases from '{1}'", release_json))
+            this.log.err("There was an error downloading '{1}' to '{2}' (error: {3})", release_json, directory, result)
+            return false
+        }
+    }
+
+    __DownloadFile(directory, url) {
+        SplitPath, url, asset_name
+        download_path := Format("{1}\{2}", directory, asset_name)
+        UrlDownloadToFile % url, %download_path%
+        result := A_LastError
+
+        if ! A_LastError {
+            this.log.verb("Downloaded '{1}' to '{2}'", url, download_path)
+            return download_path
+        } else {
+            this.log.err("There was an error downloading '{1}' to '{2}' (error: {3}", url, download_path, result)
             return false
         }
     }
@@ -99,18 +118,18 @@ class GitHub {
                         this.json_payload := JSON.Load("[" . json_str . "]")
                         this.latest_build_id := 1
                     }
-                } catch e {
-                    this.log.err("Unable to read JSON data: {1}", e)
+                } catch err {
+                    this.log.err("Unable to read JSON data: (error: {1})", err)
                     return false
                 }
 
                 this.latest_build := this.json_payload[this.latest_build_id]
             } else {
-                this.log.err(Format("Could not read JSON file '{1}'", json_file))
+                this.log.err("Could not read JSON file '{1}'", json_file)
                 return false
             }
         } else {
-            this.log.err(Format("Unable to find JSON file '{1}'", json_file))
+            this.log.err("Unable to find JSON file '{1}'", json_file)
             return false
         }
 

@@ -3,6 +3,7 @@
 ; first-party classes
 #Include %A_LineFile%\..\lib\asset.ahk
 #Include %A_LineFile%\..\lib\github.ahk
+#Include %A_LineFile%\..\lib\ini_config.ahk
 #Include %A_LineFile%\..\lib\logger.ahk
 #Include %A_LineFile%\..\lib\package.ahk
 #Include %A_LineFile%\..\lib\transfer.ahk

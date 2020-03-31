@@ -42,20 +42,21 @@ class Asset {
     __DownloadFile(directory, url) {
         SplitPath, url, asset_name
         download_path := Format("{1}\{2}", directory, asset_name)
-        UrlDownloadToFile % url, %download_path%
+        UrlDownloadToFile % url, % download_path
+        result := A_LastError
 
-        if ! ErrorLevel {
-            this.log.verb(Format("Downloaded '{1}' to '{2}'", url, download_path))
+        if ! A_LastError {
+            this.log.verb("Downloaded '{1}' to '{2}'", url, download_path)
             return download_path
         } else {
-            this.log.err(Format("There was an error downloading '{1}' to '{2}'", url, download_path))
+            this.log.err("There was an error downloading '{1}' to '{2}' (error: {3})", url, download_path, result)
             return false
         }
     }
 
     ; extracts a zip asset to a directory
     __ExtractZipAsset(asset_path, extract_dir) {
-        this.log.info(Format("Extracting asset '{1}' to '{2}'", asset_path, extract_dir))
+        this.log.verb("Extracting asset '{1}' to '{2}'", asset_path, extract_dir)
 
         FileRemoveDir % extract_dir, 1
         FileCreateDir % extract_dir
@@ -71,12 +72,12 @@ class Asset {
     ; validates the asset was downloaded correctly by comparing against a checksum file
     __ValidateAsset(asset, checksum, algo := "SHA1") {
         if ! FileExist(asset) {
-            this.log.err(Format("Unable to find asset '{1}'", asset))
+            this.log.err("Unable to find asset '{1}'", asset)
             return false
         }
 
         if ! FileExist(checksum) {
-            this.log.err(Format("Unable to find checksum '{1}'", checksum))
+            this.log.err("Unable to find checksum '{1}'", checksum)
             return false
         }
 
@@ -86,7 +87,7 @@ class Asset {
             case "SHA256": asset_checksum := LC_FileSHA256(asset)
 
             default: {
-                this.log.err(Format("Unknown checksum algorithm '{1}'", algo))
+                this.log.err("Unknown checksum algorithm '{1}'", algo)
                 return false
             }
         }
@@ -94,13 +95,14 @@ class Asset {
         ; expects standard file checksum output {hash} {filename}
         FileRead checksum_contents, % checksum
         valid_checksum := StrSplit(checksum_contents, " ")
-        this.log.verb(Format("Comparing checksums '{1}' vs '{2}'", asset_checksum, valid_checksum[1]))
+        this.log.verb("Comparing checksums '{1}' vs '{2}'", asset_checksum, valid_checksum[1])
 
         if (asset_checksum == valid_checksum[1]) {
-            this.log.verb("Checksums match!")
+            this.log.verb("Checksum for '{1}' matches", asset)
             return true
         } else {
-            this.log.verb("Checksums mismatch!")
+            this.log.error("Checksum for '{1}' does not match", asset)
+            this.log.error("Checksum values '{1}' vs '{2}'", asset_checksum, valid_checksum[1])
             return false
         }
     }
