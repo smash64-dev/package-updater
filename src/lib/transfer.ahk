@@ -23,12 +23,10 @@ class Transfer {
 
         ; we don't need this directory to exist, if it 
         ; doesn't this will just act as a copy/paste
-        if InStr(FileExist(dest_dir), "D") {
-            this.dest_dir := dest_dir
-        } else {
+        this.dest_dir := dest_dir
+        if ! InStr(FileExist(this.dest_dir), "D") {
             this.log.warn("Unable to find destination directory '{1}', creating", dest_dir)
             FileCreateDir % dest_dir
-            return true
         }
     }
 
@@ -69,13 +67,15 @@ class Transfer {
 
     ; handle managed file or directory based on specification
     ComplexFile(complex_data, action) {
+        this.log.debug("Performing complex action '{1}' on '{2}'", action, complex_data["Name"])
+
         switch action
         {
             ; https://puppet.com/docs/puppet/latest/types/file.html#file-attribute-ensure
             case "Absent":      return this.__DoAbsent(complex_data)
             case "Directory":   return this.__DoPresent(complex_data, "D")
             case "Latest":      return this.__DoLatest(complex_data)
-            case "Link":        return this.__DoPresent(complex_data, "L")
+            case "Link":        return this.__DoLatest(complex_data, "L")
             case "Present":     return this.__DoPresent(complex_data)
             
             default:
@@ -95,24 +95,12 @@ class Transfer {
     }
 
     ; ensure a path matches specific content in the destination
-    __DoLatest(complex_data) {
-        this.log.info("update")
-        return true
-    }
-
-    ; ensure a path exists in the destination
-    __DoPresent(complex_data, path_type := 0) {
-        if ! FileExist(this.dest(complex_data["Path"])) {
-            switch path_type {
-                case "D":   return this.__TransferDir(complex_data["Path"])
-                case "L":   return this.__TransferLink(complex_data["Path"], complex_data["Target"])
-                default:    return this.__TransferFile(complex_data["Path"])
-            }
-        } else {
-            this.log.verb("Complex path '{1}' already exists in destination", complex_data["Path"])
+    __DoLatest(complex_data, path_type := 0) {
+        switch path_type {
+            case "D":   return this.__TransferDir(complex_data["Path"])
+            case "L":   return this.__TransferLink(complex_data["Path"], complex_data["Target"])
+            default:    return this.__TransferFile(complex_data["Path"])
         }
-
-        return true
     }
 
     __DoNotify(complex_data) {
@@ -125,6 +113,17 @@ class Transfer {
                 this.log.error("Unknown notify directive '{1}'", complex_data["Notify"])
                 return false
         }
+    }
+
+    ; ensure a path exists in the destination
+    __DoPresent(complex_data, path_type := 0) {
+        if ! FileExist(this.dest(complex_data["Path"])) {
+            this.__DoLatest(complex_data, path_type)
+        } else {
+            this.log.verb("Complex path '{1}' already exists in destination", complex_data["Path"])
+        }
+
+        return true
     }
 
     ; return the full path of the destination
@@ -223,7 +222,7 @@ class Transfer {
         else
             link_path := Format("{1}.lnk", this.dest(link_name))
 
-        FileCreateShortcut, % this.dest(target_path), % link_path
+        FileCreateShortcut, % target_path, % link_path
         result := A_LastError
 
         this.log.verb("Transferred '{1}' (error: {2})'", link_name, result)

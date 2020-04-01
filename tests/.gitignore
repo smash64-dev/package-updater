@@ -1,0 +1,4 @@
+#.gitignore
+
+transfer destination/
+transfer source/
