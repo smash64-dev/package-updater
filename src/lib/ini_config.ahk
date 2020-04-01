@@ -1,6 +1,7 @@
 ; ini_config.ahk
 
 #Include %A_LineFile%\..\logger.ahk
+#Include %A_LineFile%\..\..\ext\json.ahk
 
 class IniConfig {
     static iclog := {}
@@ -9,7 +10,7 @@ class IniConfig {
     ini_data := {}
     ini_sections := []
 
-    __New(ini_config, verbose := 0) {
+    __New(ini_config) {
         iclog := new Logger("ini_config.ahk")
         this.log := iclog
 
@@ -20,12 +21,17 @@ class IniConfig {
         }
 
         this.log.verb("Loading config file '{1}' into memory", this.ini_config)
-        this.LoadData(verbose)
+        this.LoadData()
     }
 
     ; return the entire ini hash object
     GetData() {
         return this.ini_data
+    }
+
+    ; return the entire ini object in a JSON string
+    GetJSON() {
+        return JSON.Dump(this.ini_data)
     }
 
     ; return an array of sections in the file
@@ -82,6 +88,7 @@ class IniConfig {
 
                 for new_key, new_value in new_data[new_section] {
                     if remove {
+                        ; remove an ini key value pair
                         change_count++
 
                         if ! dry_run {
@@ -92,6 +99,7 @@ class IniConfig {
                             this.log.verb("Removing '{1}.{2}' from config (error: {3})", new_section, new_key, result)
                         }
                     } else {
+                        ; add or update an ini key value pair
                         if ! this.ini_data.HasKey(new_section) and ! dry_run {
                             this.ini_data[new_section] := {}
                             this.log.verb("Adding section '{1}' to object", new_section)
@@ -121,9 +129,8 @@ class IniConfig {
                         this.log.verb("Appending newline to end of section '{1}' (error: {2})", new_section, result)
 
                         ; HACK: FileAppend triggers an error code of ERROR_ALREADY_EXISTS but works anyway
-                        ; open a file handle and immediately close it to reset A_LastError
-                        file := FileOpen(this.ini_config, "r")
-                        file.Close()
+                        ; trigger a quick noop-style command to reset A_LastError
+                        Run echo ""
                     }
                 }
 

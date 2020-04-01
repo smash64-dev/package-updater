@@ -47,6 +47,8 @@ class GitHub {
                 asset_url := assets[A_Index].browser_download_url
                 this.log.verb("Asset '{1}' url found: '{2}'", file_name, asset_url)
                 return asset_url
+            } else {
+                this.log.debug("Asset '{1}' does not match", current_name)
             }
         } until !assets[A_Index].id
 
@@ -55,6 +57,15 @@ class GitHub {
     }
 
     GetReleases(directory) {
+        if ! InStr(FileExist(directory), "D") {
+            FileCreateDir % directory
+            log.verb("Created temp directory '{1}' (error: {2})", directory, A_LastError)
+
+            ; HACK: FileAppend triggers an error code of ERROR_ALREADY_EXISTS but works anyway
+            ; trigger a quick noop-style command to reset A_LastError
+            Run echo ""
+        }
+    
         release_json := Format("{1}\{2}-{3}.json", directory, this.github_owner, this.github_repo)
         UrlDownloadToFile % this.release_url, % release_json
         result := A_LastError
@@ -67,21 +78,6 @@ class GitHub {
             return this.__LoadJSON(release_json)
         } else {
             this.log.err("There was an error downloading '{1}' to '{2}' (error: {3})", release_json, directory, result)
-            return false
-        }
-    }
-
-    __DownloadFile(directory, url) {
-        SplitPath, url, asset_name
-        download_path := Format("{1}\{2}", directory, asset_name)
-        UrlDownloadToFile % url, %download_path%
-        result := A_LastError
-
-        if ! A_LastError {
-            this.log.verb("Downloaded '{1}' to '{2}'", url, download_path)
-            return download_path
-        } else {
-            this.log.err("There was an error downloading '{1}' to '{2}' (error: {3}", url, download_path, result)
             return false
         }
     }

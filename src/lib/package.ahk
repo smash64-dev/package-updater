@@ -7,7 +7,6 @@
 
 class Package {
     static log := {}
-    static reserved := {base_directory:true, updater_binary:true, updater_config:true}
 
     base_directory := ""
     complex_regex := "^Ensure_"
@@ -17,7 +16,7 @@ class Package {
     updater_binary := ""
     updater_config := ""
 
-    __New(updater_binary, config := "") {
+    __New(updater_binary, updater_config := "") {
         plog := new Logger("package.ahk")
         this.log := plog
 
@@ -33,28 +32,20 @@ class Package {
             this.config_func[ini_section] := true
         }
 
-        this.base_directory := this.__GetBaseDirectory(this.updater_binary, this.config_data["Package"]["Process"])
-        this.config_json := JSON.Dump(this.config_data)
-        this.log.info("config_json: '{1}'", this.config_json)
+        this.base_directory := this.__GetBaseDirectory(this.updater_binary, this.package("Process", updater_binary))
+        this.config_json := ini_config.GetJSON()
+        this.log.verb("config_json: '{1}'", this.config_json)
     }
 
     ; allows pull from different section of the config easier
     __Call(method, ByRef arg, args*) {
-        if this.config_func[method]
+        if this.config_func[method] {
             return this.__GetSectionValue(method, arg, args*)
-    }
+        } else if (method == "path") {
+            directory := this.__GetDirectory(arg)
+            file := this.__GetFile(arg)
 
-    ; allows using directory paths or filenames as properties
-    __Get(path) {
-        if ! Package.reserved[path] {
-            directory := this.GetDirectory(StrReplace(path, "_", "\"))
-
-            if directory
-                return directory
-            else
-                return this.GetFile(StrReplace(path, "_", "\"))
-        } else {
-            return this.path
+            return directory ? directory : file
         }
     }
 
@@ -115,28 +106,6 @@ class Package {
         return complex_hash
     }
 
-    ; grab the full path of a directory relative to the base directory
-    GetDirectory(path) {
-        fullpath := Format("{1}\{2}", this.base_directory, path)
-        if InStr(FileExist(fullpath), "D") {
-            return fullpath
-        }
-
-        this.log.warn("Directory '{1}' does not exist", fullpath)
-        return false
-    }
-
-    ; grab the full path of a file relative to the base directory
-    GetFile(path) {
-        fullpath := Format("{1}\{2}", this.base_directory, path)
-        if FileExist(fullpath) {
-            return fullpath
-        }
-
-        this.log.warn("File '{1}' does not exist", fullpath)
-        return false
-    }
-
     __GetBaseDirectory(updater_binary, package_binary) {
         ; FileExist works off A_WorkingDir, don't destroy that
         B_WorkingDir = %A_WorkingDir%
@@ -155,6 +124,28 @@ class Package {
         }
 
         this.log.err("Unable to determine base directory from '{1}'", updater_binary)
+        return false
+    }
+
+    ; grab the full path of a directory relative to the base directory
+    __GetDirectory(path) {
+        fullpath := Format("{1}\{2}", this.base_directory, path)
+        if InStr(FileExist(fullpath), "D") {
+            return fullpath
+        }
+
+        this.log.warn("Directory '{1}' does not exist", fullpath)
+        return false
+    }
+
+    ; grab the full path of a file relative to the base directory
+    __GetFile(path) {
+        fullpath := Format("{1}\{2}", this.base_directory, path)
+        if FileExist(fullpath) {
+            return fullpath
+        }
+
+        this.log.warn("File '{1}' does not exist", fullpath)
         return false
     }
 
