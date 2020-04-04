@@ -97,6 +97,10 @@ SetLatestPackage(old_updater, new_updater) {
 
 		log.info(rdb.SetData(new_rdb, 0, 1))
 		log.info(rdb.SetData(rm_rdb, 1, 1))
+
+		rdb_adj := new IniConfig(Format("{1}\Project64.rdb", new_package.base_directory))
+		log.warn("{1} vs {2}, match: {3}", LC_SHA256(rdb.GetJSON()), LC_SHA256(rdb_adj.GetJSON()), LC_SHA256(rdb.GetJSON()) == LC_SHA256(rdb_adj.GetJSON()))
+		log.warn("{1}", rdb.GetJSON())
 	}
 }
 

@@ -24,19 +24,28 @@ class Asset {
 
     ; download, validate, and prepare an for usage
     GetAsset(directory) {
+        if ! InStr(FileExist(directory), "D") {
+            FileCreateDir % directory
+            this.log.verb("Created temp directory '{1}' (error: {2})", directory, A_LastError)
+
+            ; HACK: FileAppend triggers an error code of ERROR_ALREADY_EXISTS but works anyway
+            ; trigger a quick noop-style command to reset A_LastError
+            FileGetAttrib, noop, % A_LineFile
+        }
+
         ; download the asset and checksum, then validate it
         asset_path := this.__DownloadFile(directory, this.asset_url)
         checksum_path := this.__DownloadFile(directory, this.checksum_url)
 
         if this.__ValidateAsset(asset_path, checksum_path, this.checksum_type) {
-            if InStr(this.asset_name, ".zip") 
+            if InStr(this.asset_name, ".zip")
                 return this.__ExtractZipAsset(asset_path, Format("{1}\latest", directory))
             else
                 return asset_path
         } else {
             return false
         }
-    } 
+    }
 
     ; download a file from remote
     __DownloadFile(directory, url) {

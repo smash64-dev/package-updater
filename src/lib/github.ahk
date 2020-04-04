@@ -5,7 +5,7 @@
 
 class GitHub {
     static ghlog := {}
-    
+
     github_api := "https://api.github.com"
     github_owner := ""
     github_repo := ""
@@ -59,13 +59,13 @@ class GitHub {
     GetReleases(directory) {
         if ! InStr(FileExist(directory), "D") {
             FileCreateDir % directory
-            log.verb("Created temp directory '{1}' (error: {2})", directory, A_LastError)
+            this.log.verb("Created temp directory '{1}' (error: {2})", directory, A_LastError)
 
             ; HACK: FileAppend triggers an error code of ERROR_ALREADY_EXISTS but works anyway
             ; trigger a quick noop-style command to reset A_LastError
-            Run echo ""
+            FileGetAttrib, noop, % A_LineFile
         }
-    
+
         release_json := Format("{1}\{2}-{3}.json", directory, this.github_owner, this.github_repo)
         UrlDownloadToFile % this.release_url, % release_json
         result := A_LastError

@@ -10,11 +10,90 @@ global log := new Logger("tests.ahk")
 global app_directory := Format("{1}\{2}", A_AppData, SELF)
 global temp_directory := Format("{1}\{2}", A_Temp, SELF)
 
+TestIniConfig() {
+    directory := Format("{1}\..\ini_config", A_LineFile)
+
+    atomic := new IniConfig(Format("{1}\atomic.ini", directory))
+    atomic_final := new IniConfig(Format("{1}\final\atomic.ini", directory))
+
+    atomic.__InsertSection("new section")
+    atomic.__InsertProperty("new section", "new key A", "new value A")
+    atomic.__UpdateProperty("new section", "new key B", "new value B")
+    atomic.__InsertProperty("new section 2", "new key A", "new value A")
+    atomic.WriteConfig()
+
+    atomic.__InsertProperty("new section", "new key B", "cannot overwrite")
+    atomic.__DeleteProperty("new section", "new key A")
+    atomic.__InsertProperty("new section", "new key A", "post delete A")
+    atomic.WriteConfig()
+
+    atomic.__DeleteProperty("new section 2", "new key A")
+    atomic.WriteConfig()
+
+    atomic_dup := new IniConfig(Format("{1}\atomic.ini", directory))
+    if ((atomic.GetJSON() != atomic_final.GetJSON()) or (atomic.GetJSON() != atomic_dup.GetJSON())) {
+        log.err("Atomic test configs do not match: test:'{1}' vs good:'{2}'", atomic.GetJSON(), atomic_final.GetJSON())
+        return false
+    }
+
+    format := new IniConfig(Format("{1}\format.ini", directory))
+    format_original := Format("{1}.bak", format.config_file)
+    format_final := new IniConfig(Format("{1}\final\format.ini", directory))
+
+    FileCopy, % format.config_file, % format_original, 1
+    format.FormatConfig()
+
+    if (LC_FileSHA(format.config_file) != LC_FileSHA(format_final.config_file)) {
+        log.err("Format test config checksums do not match: test:'{1}' vs good:'{2}'", LC_FileSHA(format.config_file), LC_FileSHA(format_final.config_file))
+        return false
+    }
+
+    initial := new IniConfig(Format("{1}\initial.ini", directory))
+    upsert_config := new IniConfig(Format("{1}\upsert.ini", directory))
+    delete_config := new IniConfig(Format("{1}\delete.ini", directory))
+    insert_final := new IniConfig(Format("{1}\final\insert.ini", directory))
+    update_final := new IniConfig(Format("{1}\final\update.ini", directory))
+    delete_final := new IniConfig(Format("{1}\final\delete.ini", directory))
+
+    initial.InsertConfig(upsert_config)
+    if (initial.GetJSON() != insert_final.GetJSON()) {
+        log.err("Insert test configs do not match: test:'{1}' vs good:'{2}'", initial.GetJSON(), insert_final.GetJSON())
+        return false
+    }
+
+    initial_copy := new IniConfig(Format("{1}\initial.ini", directory))
+    initial.RevertConfig()
+    if (initial.GetJSON() != initial_copy.GetJSON()) {
+        log.err("Revert test configs do not match: test:'{1}' vs good:'{2}'", initial.GetJSON(), initial_copy.GetJSON())
+        return false
+    }
+
+    initial.UpdateConfig(upsert_config)
+    if (initial.GetJSON() != update_final.GetJSON()) {
+        log.err("Update test configs do not match: test:'{1}' vs good:'{2}'", initial.GetJSON(), update_final.GetJSON())
+        return false
+    }
+
+    initial.RevertConfig()
+    initial.DeleteConfig(delete_config)
+    if (initial.GetJSON() != delete_final.GetJSON()) {
+        log.err("Delete test configs do not match: test:'{1}' vs good:'{2}'", initial.GetJSON(), delete_final.GetJSON())
+        return false
+    }
+
+    ; remove and restore unnecesasry test data
+    FileDelete, % atomic.config_file
+    FileCopy, % format_original, % format.config_file, 1
+    FileDelete, % format_original
+
+    return true
+}
+
 TestGithub() {
     global temp_directory
 
     gh_owner := "smash64-dev"
-    gh_repo := "project64k-legacy"
+    gh_repo := "package-updater"
 
     github_stable := new Github(gh_owner, gh_repo, 0)
     github_beta := new Github(gh_owner, gh_repo, 1)
@@ -26,9 +105,39 @@ TestGithub() {
 
     github_beta.GetReleases(temp_directory)
     package_url := github_beta.GetFileURL(Format("{1}.zip", gh_repo))
+    checksum_url := github_beta.GetFileURL("sha1sum.txt")
 
     if ! package_url {
         log.err("Unable to find latest package URL")
+        return false
+    }
+
+    if ! checksum_url {
+        log.err("Unable to find latest checksum URL")
+        return false
+    }
+
+	asset := new Asset(Format("{1}.zip", gh_repo), package_url, checksum_url, "SHA1")
+
+    ; test the internal methods individually
+    asset_path := asset.__DownloadFile(temp_directory, asset.asset_url)
+    checksum_path := asset.__DownloadFile(temp_directory, asset.checksum_url)
+    if (! FileExist(asset_path) or ! FileExist(checksum_path)) {
+        log.err("Unable to download asset data")
+        return false
+    }
+
+    valid_asset := asset.__ValidateAsset(asset_path, checksum_path, "SHA1")
+    if ! valid_asset {
+        log.err("Unable to validate asset")
+        return false
+    }
+
+    ; test the primary all-in-one method
+    FileRemoveDir, % temp_directory, 1
+	asset_location := asset.GetAsset(temp_directory)
+    if (! asset_location or ! FileExist(asset_location)) {
+        log.err("Unable to get and validate asset data")
         return false
     }
 
@@ -169,7 +278,7 @@ TestTransfer() {
         log.err("'ensure latest file.txt' was not properly updated")
         return false
     }
-    
+
     ; test ensure link
     FileGetShortcut % transfer.dest("windows directory.lnk"), link_target
     if (link_target != "C:\Windows") {
@@ -204,8 +313,9 @@ log.info("= {1} (v{2})", SELF, VERSION)
 log.info("===================================")
 
 ; run tests
-package_test := TestPackage()
-github_test := TestGithub()
-transfer_test := TestTransfer()
+;package_test := TestPackage()
+;github_test := TestGithub()
+ini_config_test := TestIniConfig()
+;transfer_test := TestTransfer()
 
-; TODO: Asset, ini_config
+exit

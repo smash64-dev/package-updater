@@ -21,7 +21,7 @@ class Transfer {
             return false
         }
 
-        ; we don't need this directory to exist, if it 
+        ; we don't need this directory to exist, if it
         ; doesn't this will just act as a copy/paste
         this.dest_dir := dest_dir
         if ! InStr(FileExist(this.dest_dir), "D") {
@@ -62,7 +62,7 @@ class Transfer {
 
     ; TODO: backup file
     BackupFile() {
-        
+
     }
 
     ; handle managed file or directory based on specification
@@ -73,11 +73,11 @@ class Transfer {
         {
             ; https://puppet.com/docs/puppet/latest/types/file.html#file-attribute-ensure
             case "Absent":      return this.__DoAbsent(complex_data)
-            case "Directory":   return this.__DoPresent(complex_data, "D")
+            case "Directory":   return this.__DoLatest(complex_data, "D")
             case "Latest":      return this.__DoLatest(complex_data)
             case "Link":        return this.__DoLatest(complex_data, "L")
             case "Present":     return this.__DoPresent(complex_data)
-            
+
             default:
                 this.log.error("Unknown action '{1}'", action)
                 return false
@@ -208,7 +208,7 @@ class Transfer {
         result := A_LastError
 
         this.log.verb("Transferred '{1}' (error: {2})'", path_name, result)
-        return result ? false : true    
+        return result ? false : true
     }
 
     ; ensures ini section/kvp exist or don't exist in the destination
@@ -226,6 +226,6 @@ class Transfer {
         result := A_LastError
 
         this.log.verb("Transferred '{1}' (error: {2})'", link_name, result)
-        return result ? false : true    
+        return result ? false : true
     }
 }

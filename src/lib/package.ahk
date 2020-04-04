@@ -53,7 +53,7 @@ class Package {
     Backup(directory, keep_old := 0) {
         FormatTime, now,, yyyy-MM-dd-HHmmss
         backup_zip := Format("{1}\backup-{2}-{3}.zip", directory, this.config_data["Package"]["Name"], now)
-        
+
         this.log.info("Backing up '{1}' to '{2}'", this.base_directory, backup_zip)
         Zip(this.base_directory, backup_zip)
 
@@ -110,7 +110,7 @@ class Package {
         ; FileExist works off A_WorkingDir, don't destroy that
         B_WorkingDir = %A_WorkingDir%
         SplitPath, updater_binary,, current_dir
-        
+
         ; we shouldn't be more than 5 subdirectories deep anyway
         loop, 5 {
             SetWorkingDir, %current_dir%

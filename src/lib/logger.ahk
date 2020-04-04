@@ -5,7 +5,7 @@ class Logger {
     static loglevels := {crit: [1, "C"], err:[2, "E"], warn:[3, "W"], info:[4, "I"], verb:[5, "V"], debug:[6, "D"]}
 
     tag := ""
-    verbosity := 6
+    verbosity := 5
 
     __New(tag := "") {
         this.tag := tag ? tag : A_ScriptName
@@ -13,7 +13,7 @@ class Logger {
 
         ; have a different verbosity level when compiled
         if is_compiled {
-            this.verbosity := 6
+            this.verbosity := 2
         }
     }
 
