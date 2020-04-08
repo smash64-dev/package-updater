@@ -10,6 +10,61 @@ global log := new Logger("tests.ahk")
 global app_directory := Format("{1}\{2}", A_AppData, SELF)
 global temp_directory := Format("{1}\{2}", A_Temp, SELF)
 
+TestGithub() {
+    global temp_directory
+
+    gh_owner := "smash64-dev"
+    gh_repo := "package-updater"
+
+    github_stable := new Github(gh_owner, gh_repo, 0)
+    github_beta := new Github(gh_owner, gh_repo, 1)
+
+    if (github_stable == github_beta) {
+        log.err("Stable and beta release URLs should not match")
+        return false
+    }
+
+    github_beta.GetReleases(temp_directory)
+    package_url := github_beta.GetFileURL(Format("{1}.zip", gh_repo))
+    checksum_url := github_beta.GetFileURL("sha1sum.txt")
+
+    if ! package_url {
+        log.err("Unable to find latest package URL")
+        return false
+    }
+
+    if ! checksum_url {
+        log.err("Unable to find latest checksum URL")
+        return false
+    }
+
+	asset := new Asset(Format("{1}.zip", gh_repo), package_url, checksum_url, "SHA1")
+
+    ; test the internal methods individually
+    asset_path := asset.__DownloadFile(temp_directory, asset.asset_url)
+    checksum_path := asset.__DownloadFile(temp_directory, asset.checksum_url)
+    if (! FileExist(asset_path) or ! FileExist(checksum_path)) {
+        log.err("Unable to download asset data")
+        return false
+    }
+
+    valid_asset := asset.__ValidateAsset(asset_path, checksum_path, "SHA1")
+    if ! valid_asset {
+        log.err("Unable to validate asset")
+        return false
+    }
+
+    ; test the primary all-in-one method
+    FileRemoveDir, % temp_directory, 1
+	asset_location := asset.GetAsset(temp_directory)
+    if (! asset_location or ! FileExist(asset_location)) {
+        log.err("Unable to get and validate asset data")
+        return false
+    }
+
+    return true
+}
+
 TestIniConfig() {
     directory := Format("{1}\..\ini_config", A_LineFile)
 
@@ -89,61 +144,6 @@ TestIniConfig() {
     return true
 }
 
-TestGithub() {
-    global temp_directory
-
-    gh_owner := "smash64-dev"
-    gh_repo := "package-updater"
-
-    github_stable := new Github(gh_owner, gh_repo, 0)
-    github_beta := new Github(gh_owner, gh_repo, 1)
-
-    if (github_stable == github_beta) {
-        log.err("Stable and beta release URLs should not match")
-        return false
-    }
-
-    github_beta.GetReleases(temp_directory)
-    package_url := github_beta.GetFileURL(Format("{1}.zip", gh_repo))
-    checksum_url := github_beta.GetFileURL("sha1sum.txt")
-
-    if ! package_url {
-        log.err("Unable to find latest package URL")
-        return false
-    }
-
-    if ! checksum_url {
-        log.err("Unable to find latest checksum URL")
-        return false
-    }
-
-	asset := new Asset(Format("{1}.zip", gh_repo), package_url, checksum_url, "SHA1")
-
-    ; test the internal methods individually
-    asset_path := asset.__DownloadFile(temp_directory, asset.asset_url)
-    checksum_path := asset.__DownloadFile(temp_directory, asset.checksum_url)
-    if (! FileExist(asset_path) or ! FileExist(checksum_path)) {
-        log.err("Unable to download asset data")
-        return false
-    }
-
-    valid_asset := asset.__ValidateAsset(asset_path, checksum_path, "SHA1")
-    if ! valid_asset {
-        log.err("Unable to validate asset")
-        return false
-    }
-
-    ; test the primary all-in-one method
-    FileRemoveDir, % temp_directory, 1
-	asset_location := asset.GetAsset(temp_directory)
-    if (! asset_location or ! FileExist(asset_location)) {
-        log.err("Unable to get and validate asset data")
-        return false
-    }
-
-    return true
-}
-
 TestPackage() {
     package := new Package(A_LineFile, Format("{1}\..\..\conf\tests.cfg", A_LineFile))
 
@@ -204,6 +204,7 @@ TestTransfer() {
     ; -------------------------------------------------------------------------
     FileAppend, % "basic file", % transfer.src("basic file.txt")
     FileCreateDir, % transfer.src("basic directory")
+    FileAppend, % "basic file", % transfer.src("basic directory\basic file.txt")
 
     FileAppend, % "overwritten", % transfer.src("modified basic.txt")
     FileAppend, % "overwrite me", % transfer.dest("modified basic.txt")
@@ -243,6 +244,11 @@ TestTransfer() {
     FileAppend, % "ensure present file", % transfer.src("ensure present file modified.txt")
     FileAppend, % "ensure present file modified", % transfer.dest("ensure present file modified.txt")
 
+    FileCreateDir, % transfer.dest("ensure duplicate directory")
+    FileCreateDir, % transfer.dest("ensure rename directory")
+    FileAppend, % "ensure duplicate directory file", % transfer.dest("ensure duplicate directory\file.txt")
+    FileAppend, % "ensure rename directory file", % transfer.dest("ensure rename directory\file.txt")
+
     ; perform the complex transfer
     for complex, action in package.GetComplexKeys() {
 	    complex_data := package.config_data[complex]
@@ -264,6 +270,12 @@ TestTransfer() {
     ; test ensure directory
     if ! InStr(FileExist(transfer.dest("ensure directory")), "D") {
         log.err("'ensure directory' was not properly created")
+        return false
+    }
+
+    ; test ensure duplicate directory
+    if (LC_FileSHA(transfer.dest("ensure duplicate directory\file.txt")) != LC_FileSHA(transfer.dest("ensure duplicate directory 2\file.txt"))) {
+        log.err("'ensure duplicate directory' was not properly duplicated")
         return false
     }
 
@@ -298,9 +310,26 @@ TestTransfer() {
         return false
     }
 
+    ; test ensure renaming dir
+    if ! InStr(FileExist(transfer.dest("ensure rename directory 2")), "D") {
+        log.err("'ensure rename directort 2' was not properly renamed")
+        return false
+    }
+
+    ; test ensure renaming file
+    if FileExist(transfer.dest("ensure duplicate directory 2\renamed.txt")) {
+        if (LC_FileSHA(transfer.dest("ensure duplicate directory\file.txt")) == LC_FileSHA(transfer.dest("ensure duplicate directory 2\renamed.txt"))) {
+            log.err("'ensure rename file' was not properly renamed")
+            return false
+        }
+    } else {
+        log.err("'ensure rename file' was not properly renamed")
+        return false
+    }
+
     ; remove unnecesasry test data
     ; -------------------------------------------------------------------------
-    for index, dir in [src, dest] {
+    for index, dir in [dest] {
         FileRemoveDir, % dir, 1
     }
 
@@ -313,9 +342,9 @@ log.info("= {1} (v{2})", SELF, VERSION)
 log.info("===================================")
 
 ; run tests
-;package_test := TestPackage()
+package_test := TestPackage()
 ;github_test := TestGithub()
-ini_config_test := TestIniConfig()
-;transfer_test := TestTransfer()
+;ini_config_test := TestIniConfig()
+transfer_test := TestTransfer()
 
 exit

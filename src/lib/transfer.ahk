@@ -74,9 +74,11 @@ class Transfer {
             ; https://puppet.com/docs/puppet/latest/types/file.html#file-attribute-ensure
             case "Absent":      return this.__DoAbsent(complex_data)
             case "Directory":   return this.__DoLatest(complex_data, "D")
+            case "Duplicate":   return this.__DoDuplicate(complex_data)
             case "Latest":      return this.__DoLatest(complex_data)
             case "Link":        return this.__DoLatest(complex_data, "L")
             case "Present":     return this.__DoPresent(complex_data)
+            case "Rename":      return this.__DoRename(complex_data)
 
             default:
                 this.log.error("Unknown action '{1}'", action)
@@ -84,13 +86,30 @@ class Transfer {
         }
     }
 
+    ; TODO: go through and actually write to the INI files
+    ComplexWriteIni() {
+        ; may not be needed
+    }
+
     ; ensure a path does not exist in the destination
     __DoAbsent(complex_data) {
         if FileExist(this.dest(complex_data["Path"])) {
-            return this.__TransferDelete(complex_data["Path"])
+            recurse := complex_data.HasKey("Recurse") ? complex_data["Recurse"] : 0
+            return this.__TransferDelete(complex_data["Path"], recurse)
         } else {
             this.log.verb("Complex file '{1}' already removed from destination", complex_data["Path"])
             return true
+        }
+    }
+
+    ; ensure a path is duplicated in the package
+    __DoDuplicate(complex_data) {
+        if FileExist(this.dest(complex_data["Path"])) {
+            overwrite := complex_data.HasKey("Overwrite") ? complex_data["Overwrite"] : 0
+            return this.__TransferRelative(complex_data["Path"], complex_data["Target"], 1, overwrite)
+        } else {
+            this.log.warn("Complex path '{1}' does not exist in destination", complex_data["Path"])
+            return false
         }
     }
 
@@ -124,6 +143,17 @@ class Transfer {
         }
 
         return true
+    }
+
+    ; ensure a path is moved to a different path in the destination
+    __DoRename(complex_data) {
+        if FileExist(this.dest(complex_data["Path"])) {
+            overwrite := complex_data.HasKey("Overwrite") ? complex_data["Overwrite"] : 0
+            return this.__TransferRelative(complex_data["Path"], complex_data["Target"], 0, overwrite)
+        } else {
+            this.log.warn("Complex path '{1}' does not exist in destination", complex_data["Path"])
+            return false
+        }
     }
 
     ; return the full path of the destination
@@ -168,22 +198,24 @@ class Transfer {
     ; when absent is true, it ensures the data is missing from the destination
     ; this only works for ini style config files
     __HasLatestContent(path_name, valid_content, absent := 0) {
-
+        ; uses __WriteIni(dry_run = 1) determine change count
+        ; if change count > 0 then return false
+        ; valid_content is the ini_config object
     }
 
     ; delete a file or directory (recursive) on the destination
-    __TransferDelete(path_name) {
+    __TransferDelete(path_name, recurse := 0) {
         if InStr(FileExist(this.dest(path_name)), "D") {
-            FileRemoveDir % this.dest(path_name), 1
+            FileRemoveDir % this.dest(path_name), recurse
             result := A_LastError
 
-            this.log.verb("Deleted directory '{1}' (error: {2})'", path_name, A_LastError)
+            this.log.verb("[TDe] Deleted directory '{1}' (error: {2})", path_name, A_LastError)
             return result ? false : true
         } else if FileExist(this.dest(path_name)) {
             FileDelete % this.dest(path_name)
             result := A_LastError
 
-            this.log.verb("Deleted file '{1}' (error: {2})'", path_name, A_LastError)
+            this.log.verb("[TDe] Deleted file '{1}' (error: {2})", path_name, A_LastError)
             return result ? false : true
         } else {
             return true
@@ -196,7 +228,7 @@ class Transfer {
             FileCreateDir % this.dest(path_name)
             result := A_LastError
 
-            this.log.verb("Transferred '{1}' (error: {2})'", path_name, result)
+            this.log.verb("[TDi] Transferred '{1}' (error: {2})", path_name, result)
             return result ? false : true
         }
         return true
@@ -207,7 +239,7 @@ class Transfer {
         FileCopy, % this.src(path_name), % this.dest(path_name), 1
         result := A_LastError
 
-        this.log.verb("Transferred '{1}' (error: {2})'", path_name, result)
+        this.log.verb("[TF] Transferred '{1}' (error: {2})", path_name, result)
         return result ? false : true
     }
 
@@ -225,7 +257,37 @@ class Transfer {
         FileCreateShortcut, % target_path, % link_path
         result := A_LastError
 
-        this.log.verb("Transferred '{1}' (error: {2})'", link_name, result)
+        this.log.verb("[TL] Transferred '{1}' (error: {2})'", link_name, result)
         return result ? false : true
+    }
+
+    ; moves or copies a file or directory within the destination package
+    __TransferRelative(old_path, new_path, copy := 0, overwrite := 0) {
+        overwrite_final := overwrite
+
+        if InStr(FileExist(this.dest(old_path)), "D") {
+            if copy {
+                FileCopyDir, % this.dest(old_path), % this.dest(new_path), overwrite_final
+            } else {
+                overwrite_final := overwrite_final ? 2 : 0
+                FileMoveDir, % this.dest(old_path), % this.dest(new_path), % overwrite_final
+            }
+            result := A_LastError
+
+            this.log.verb("[TR] Transferred directory '{1}' to '{2}' (overwrite: {3}) (error: {4})", old_path, new_path, overwrite_final, A_LastError)
+            return result ? false : true
+        } else if FileExist(this.dest(old_path)) {
+            if copy
+                FileCopy, % this.dest(old_path), % this.dest(new_path), overwrite_final
+            else
+                FileMove, % this.dest(old_path), % this.dest(new_path), % overwrite_final
+            result := A_LastError
+
+            this.log.verb("[TR] Transferred directory '{1}' to '{2}' (overwrite: {3}) (error: {4})", old_path, new_path, overwrite_final, A_LastError)
+            return result ? false : true
+        } else {
+            this.log.error("[TR] Original path '{1}' does not exist", old_path)
+            return false
+        }
     }
 }

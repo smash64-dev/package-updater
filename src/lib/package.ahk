@@ -79,6 +79,7 @@ class Package {
         }
     }
 
+    ; returns an object of special keys
     GetComplexKeys() {
         complex_hash := {}
 
@@ -100,6 +101,18 @@ class Package {
             if RegExMatch(key, this.complex_regex) {
                 path := this.config_data[key]["Path"]
                 complex_hash[path] := key
+
+                ; add target paths to complex paths
+                if this.config_data[key].HasKey("Target") {
+                    path := this.config_data[key]["Target"]
+                    complex_hash[path] := key
+                }
+
+                ; add content paths to complex paths (ini)
+                if this.config_data[key].HasKey("Content") {
+                    path := this.config_data[key]["Content"]
+                    complex_hash[path] := key
+                }
             }
         }
 
