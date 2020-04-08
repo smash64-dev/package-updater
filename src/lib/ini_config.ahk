@@ -152,9 +152,7 @@ class IniConfig {
 
             ; delete the entire section if there are no more keys
             ; important: do not use Length() use Count()
-            this.log.verb("talking about {1} count {2}", section_name, this.data[section_name].Count())
             if ! this.data[section_name].Count() {
-                this.log.verb("wer're going to remove stuff now")
                 this.__DeleteSection(section_name, 1)
             }
             return true
@@ -262,24 +260,27 @@ class IniConfig {
         change_count := 0
 
         try {
-            ; add and update new data
-            for index, new_section in this.sections {
-                for new_key, new_value in this.data[new_section] {
-                    change_count++
-
-                    if ! dry_run {
-                        IniWrite, % new_value, % this.config_file, % new_section, % new_key
-                        result := A_LastError
-
-                        this.log.verb("Updating '{1}.{2}' to '{3}' (error: {4})", new_key, new_section, new_value, result)
-                    }
-                }
-            }
-
             ; compare against the file on disk
             old_data := {}
             old_sections := []
             this.__ReadIni(old_data, old_sections)
+
+            ; add and update new data
+            for index, new_section in this.sections {
+                for new_key, new_value in this.data[new_section] {
+                    ; only count the change if the value is actually different
+                    if (this.data[new_section][new_key] != old_data[new_section][new_key]) {
+                        change_count++
+
+                        if ! dry_run {
+                            IniWrite, % new_value, % this.config_file, % new_section, % new_key
+                            result := A_LastError
+
+                            this.log.verb("Updating '{1}.{2}' to '{3}' (error: {4})", new_section, new_key, new_value, result)
+                        }
+                    }
+                }
+            }
 
             ; remove deleted data
             for index, old_section in old_sections {
@@ -304,7 +305,7 @@ class IniConfig {
                             IniDelete, % this.config_file, % old_section, % old_key
                             result := A_LastError
 
-                            this.log.verb("Removing '{1}.{2}' from '{3}' (error: {4})", new_key, new_section, new_value, result)
+                            this.log.verb("Removing '{1}.{2}' from '{3}' (error: {4})", new_section, new_key, new_value, result)
                         }
                     }
                 }

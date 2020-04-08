@@ -10,8 +10,26 @@ global log := new Logger("tests.ahk")
 global app_directory := Format("{1}\{2}", A_AppData, SELF)
 global temp_directory := Format("{1}\{2}", A_Temp, SELF)
 
+assert(description, test, fail_extra := "") {
+    if (test == "TODO") {
+        log.crit("TODO: {1}", description)
+        return true
+    } else if (test) {
+        log.crit("FAIL: {1}", description)
+
+        if fail_extra {
+            log.info("{1}", fail_extra)
+        }
+        return false
+    } else {
+        log.crit("PASS: {1}", description)
+        return true
+    }
+}
+
 TestGithub() {
     global temp_directory
+    log.crit("=== Performing Github Tests ===")
 
     gh_owner := "smash64-dev"
     gh_repo := "package-updater"
@@ -19,53 +37,37 @@ TestGithub() {
     github_stable := new Github(gh_owner, gh_repo, 0)
     github_beta := new Github(gh_owner, gh_repo, 1)
 
-    if (github_stable == github_beta) {
-        log.err("Stable and beta release URLs should not match")
-        return false
-    }
+    assert("Checking that stable and beta release URLS do not match", github_stable == github_beta)
 
     github_beta.GetReleases(temp_directory)
     package_url := github_beta.GetFileURL(Format("{1}.zip", gh_repo))
     checksum_url := github_beta.GetFileURL("sha1sum.txt")
 
-    if ! package_url {
-        log.err("Unable to find latest package URL")
-        return false
-    }
-
-    if ! checksum_url {
-        log.err("Unable to find latest checksum URL")
-        return false
-    }
+    assert("Latest package URL exists", ! package_url)
+    assert("Latest checksum URL exists", ! checksum_url)
 
 	asset := new Asset(Format("{1}.zip", gh_repo), package_url, checksum_url, "SHA1")
 
     ; test the internal methods individually
     asset_path := asset.__DownloadFile(temp_directory, asset.asset_url)
     checksum_path := asset.__DownloadFile(temp_directory, asset.checksum_url)
-    if (! FileExist(asset_path) or ! FileExist(checksum_path)) {
-        log.err("Unable to download asset data")
-        return false
-    }
+    assert("Downloaded asset data", (! FileExist(asset_path) or ! FileExist(checksum_path)))
 
     valid_asset := asset.__ValidateAsset(asset_path, checksum_path, "SHA1")
-    if ! valid_asset {
-        log.err("Unable to validate asset")
-        return false
-    }
+    assert("Validating asset", ! valid_asset)
 
     ; test the primary all-in-one method
     FileRemoveDir, % temp_directory, 1
 	asset_location := asset.GetAsset(temp_directory)
-    if (! asset_location or ! FileExist(asset_location)) {
-        log.err("Unable to get and validate asset data")
-        return false
-    }
+    assert("Get and validate asset data", (! asset_location or ! FileExist(asset_location)))
 
     return true
 }
 
 TestIniConfig() {
+    global temp_directory
+    log.crit("=== Performing IniConfig Tests ===")
+
     directory := Format("{1}\..\ini_config", A_LineFile)
 
     atomic := new IniConfig(Format("{1}\atomic.ini", directory))
@@ -86,10 +88,8 @@ TestIniConfig() {
     atomic.WriteConfig()
 
     atomic_dup := new IniConfig(Format("{1}\atomic.ini", directory))
-    if ((atomic.GetJSON() != atomic_final.GetJSON()) or (atomic.GetJSON() != atomic_dup.GetJSON())) {
-        log.err("Atomic test configs do not match: test:'{1}' vs good:'{2}'", atomic.GetJSON(), atomic_final.GetJSON())
-        return false
-    }
+    fail_extra := Format("test:'{1}' vs good:'{2}'", atomic.GetJSON(), atomic_final.GetJSON())
+    assert("Atomic test config data", ((atomic.GetJSON() != atomic_final.GetJSON()) or (atomic.GetJSON() != atomic_dup.GetJSON())), fail_extra)
 
     format := new IniConfig(Format("{1}\format.ini", directory))
     format_original := Format("{1}.bak", format.config_file)
@@ -98,10 +98,8 @@ TestIniConfig() {
     FileCopy, % format.config_file, % format_original, 1
     format.FormatConfig()
 
-    if (LC_FileSHA(format.config_file) != LC_FileSHA(format_final.config_file)) {
-        log.err("Format test config checksums do not match: test:'{1}' vs good:'{2}'", LC_FileSHA(format.config_file), LC_FileSHA(format_final.config_file))
-        return false
-    }
+    fail_extra := Format("test:'{1}' vs good:'{2}'", LC_FileSHA(format.config_file), LC_FileSHA(format_final.config_file))
+    assert("Format test config checksums", LC_FileSHA(format.config_file) != LC_FileSHA(format_final.config_file), fail_extra)
 
     initial := new IniConfig(Format("{1}\initial.ini", directory))
     upsert_config := new IniConfig(Format("{1}\upsert.ini", directory))
@@ -111,30 +109,22 @@ TestIniConfig() {
     delete_final := new IniConfig(Format("{1}\final\delete.ini", directory))
 
     initial.InsertConfig(upsert_config)
-    if (initial.GetJSON() != insert_final.GetJSON()) {
-        log.err("Insert test configs do not match: test:'{1}' vs good:'{2}'", initial.GetJSON(), insert_final.GetJSON())
-        return false
-    }
+    fail_extra := Format("test:'{1}' vs good:'{2}'", initial.GetJSON(), insert_final.GetJSON())
+    assert("Insert test config data", initial.GetJSON() != insert_final.GetJSON(), fail_extra)
 
     initial_copy := new IniConfig(Format("{1}\initial.ini", directory))
     initial.RevertConfig()
-    if (initial.GetJSON() != initial_copy.GetJSON()) {
-        log.err("Revert test configs do not match: test:'{1}' vs good:'{2}'", initial.GetJSON(), initial_copy.GetJSON())
-        return false
-    }
+    fail_extra := Format("test:'{1}' vs good:'{2}'", initial.GetJSON(), initial_copy.GetJSON())
+    assert("Revert test config data", initial.GetJSON() != initial_copy.GetJSON(), fail_extra)
 
     initial.UpdateConfig(upsert_config)
-    if (initial.GetJSON() != update_final.GetJSON()) {
-        log.err("Update test configs do not match: test:'{1}' vs good:'{2}'", initial.GetJSON(), update_final.GetJSON())
-        return false
-    }
+    fail_extra := Format("test:'{1}' vs good:'{2}'", initial.GetJSON(), update_final.GetJSON())
+    assert("Update test config data", initial.GetJSON() != update_final.GetJSON(), fail_extra)
 
     initial.RevertConfig()
     initial.DeleteConfig(delete_config)
-    if (initial.GetJSON() != delete_final.GetJSON()) {
-        log.err("Delete test configs do not match: test:'{1}' vs good:'{2}'", initial.GetJSON(), delete_final.GetJSON())
-        return false
-    }
+    fail_extra := Format("test:'{1}' vs good:'{2}'", initial.GetJSON(), delete_final.GetJSON())
+    assert("Delete test config data", initial.GetJSON() != delete_final.GetJSON(), fail_extra)
 
     ; remove and restore unnecesasry test data
     FileDelete, % atomic.config_file
@@ -145,45 +135,31 @@ TestIniConfig() {
 }
 
 TestPackage() {
+    global temp_directory
+    log.crit("=== Performing Package Tests ===")
+
     package := new Package(A_LineFile, Format("{1}\..\..\conf\tests.cfg", A_LineFile))
 
-    if package.package("Name") != "package-updater-tests" {
-        log.err("Package name invalid")
-        return false
-    }
-
-    if package.updater("Invalid", "default") != "default" {
-        log.err("Bad key default invalid")
-        return false
-    }
-
-    if package.path("README.md") == "" {
-        log.err("Unable to find README.md")
-        return false
-    }
-
-    if package.path("invalid\dir\path") != 0 {
-        log.err("Found non-existant directory")
-        return false
-    }
+    assert("Package name", package.package("Name") != "package-updater-tests")
+    assert("Invalid key default value", package.updater("Invalid", "default") != "default")
+    assert("Path to 'README.md'", package.path("README.md") == "")
+    assert("Path to invalid directory", package.path("invalid\dir\path") != 0)
 
     complex_paths := package.GetComplexPaths()
-    if (! complex_paths.HasKey("ensure directory") or ! complex_paths.HasKey("ensure present file.txt")) {
-        log.err("Complex paths is missing basic definitions")
-        return false
-    }
+    assert("Build complex paths", (! complex_paths.HasKey("ensure directory") or ! complex_paths.HasKey("ensure present file.txt")))
 
     complex_keys := package.GetComplexKeys()
-    if (! complex_keys.HasKey("Ensure_Directory") or ! complex_keys.HasKey("Ensure_Present_File")) {
-        log.err("Complex keys is missing basic definitions")
-        return false
-    }
+    assert("Build complex keys", (! complex_keys.HasKey("Ensure_Directory") or ! complex_keys.HasKey("Ensure_Present_File")))
 
-    ; TODO: Backup
+    assert("Backup()", "TODO")
+
     return true
 }
 
 TestTransfer() {
+    global temp_directory
+    log.crit("=== Performing Transfer Tests ===")
+
     ; this should already be verified
     package := new Package(A_LineFile, Format("{1}\..\..\conf\tests.cfg", A_LineFile))
 
@@ -193,8 +169,6 @@ TestTransfer() {
     dest := Format("{1}\{2}", package.base_directory, "tests\transfer destination")
 
     ; don't create destination, have Transfer make it
-    FileRemoveDir, % src, 1
-    FileCreateDir, % src
     FileRemoveDir, % dest, 1
 
     transfer := new Transfer(src, dest)
@@ -202,46 +176,25 @@ TestTransfer() {
 
     ; create basic files in both source and destination
     ; -------------------------------------------------------------------------
-    FileAppend, % "basic file", % transfer.src("basic file.txt")
-    FileCreateDir, % transfer.src("basic directory")
-    FileAppend, % "basic file", % transfer.src("basic directory\basic file.txt")
-
-    FileAppend, % "overwritten", % transfer.src("modified basic.txt")
     FileAppend, % "overwrite me", % transfer.dest("modified basic.txt")
 
     ; perform the basic transfer
     transfer.BasicFiles(complex_paths)
 
-    ; test basic file transfer
-    if ! FileExist(transfer.dest("basic file.txt")) {
-        log.err("'basic file.txt' did not transfer properly")
-        return false
-    }
-
-    ; test basic directory transfer
-    if ! InStr(FileExist(transfer.dest("basic directory")), "D") {
-        log.err("'basic directory' did not transfer properly")
-        return false
-    }
+    ; test basic file and directory transfer
+    assert("Transfer 'basic file.txt'", ! FileExist(transfer.dest("basic file.txt")))
+    assert("Transfer 'basic directory'", ! InStr(FileExist(transfer.dest("basic directory")), "D"))
 
     ; test basic file overwriting
     FileRead, modified_basic, % transfer.dest("modified basic.txt")
-    if (modified_basic != "overwritten") {
-        log.err("'modified basic.txt' was not overwritten")
-        return false
-    }
+    assert("Overwrite 'modified basic.txt'", modified_basic != "overwritten")
 
     ; create complex files in both source and destination
     ; -------------------------------------------------------------------------
     FileAppend, % "ensure absent file", % transfer.dest("ensure absent file.txt")
     FileCreateDir, % transfer.dest("ensure absent directory")
 
-    FileAppend, % "ensure latest file", % transfer.src("ensure latest file.txt")
-    FileAppend, % "ensure latest file", % transfer.src("ensure latest file modified.txt")
     FileAppend, % "ensure latest file modified", % transfer.dest("ensure latest file modified.txt")
-
-    FileAppend, % "ensure present file", % transfer.src("ensure present file.txt")
-    FileAppend, % "ensure present file", % transfer.src("ensure present file modified.txt")
     FileAppend, % "ensure present file modified", % transfer.dest("ensure present file modified.txt")
 
     FileCreateDir, % transfer.dest("ensure duplicate directory")
@@ -255,77 +208,42 @@ TestTransfer() {
 		result := transfer.ComplexFile(complex_data, action)
 	}
 
-    ; test ensure absent file
-    if FileExist(transfer.dest("ensure absent file.txt")) {
-        log.err("'ensure absent file.txt' was not properly removed")
-        return false
-    }
+    ; test ensure absent file and directory
+    assert("Remove 'ensure absent file.txt'", FileExist(transfer.dest("ensure absent file.txt")))
+    assert("Remove 'ensure absent directory'", InStr(FileExist(transfer.dest("ensure absent directory")), "D"))
 
-    ; test ensure absent directory
-    if InStr(FileExist(transfer.dest("ensure absent directory")), "D") {
-        log.err("'ensure absent directory' was not properly removed")
-        return false
-    }
+    ; test ensure directory things
+    assert("Create 'ensure directory'", ! InStr(FileExist(transfer.dest("ensure directory")), "D"))
+    assert("Duplicate 'ensure duplicate directory'", (LC_FileSHA(transfer.dest("ensure duplicate directory\file.txt")) != LC_FileSHA(transfer.dest("ensure duplicate directory 2\file.txt"))))
 
-    ; test ensure directory
-    if ! InStr(FileExist(transfer.dest("ensure directory")), "D") {
-        log.err("'ensure directory' was not properly created")
-        return false
-    }
+    ; test ensure ini content
+    initial = new IniConfig(transfer.dest("ini config\initial.ini"))
+    final = new IniConfig(transfer.dest("ini config\final.ini"))
+    fail_extra := Format("test:'{1}' vs good:'{2}'", initial.GetJSON(), final.GetJSON())
+    assert("Ensure changing ini config data", initial.GetJSON() != final.GetJSON(), fail_extra)
 
-    ; test ensure duplicate directory
-    if (LC_FileSHA(transfer.dest("ensure duplicate directory\file.txt")) != LC_FileSHA(transfer.dest("ensure duplicate directory 2\file.txt"))) {
-        log.err("'ensure duplicate directory' was not properly duplicated")
-        return false
-    }
+    ; test ensure ini match
+    initial = new IniConfig(transfer.src("ini config\match.ini"))
+    final = new IniConfig(transfer.dest("ini config\match.ini"))
+    fail_extra := Format("test:'{1}' vs good:'{2}'", initial.GetJSON(), final.GetJSON())
+    assert("Ensure unchanging ini config data", initial.GetJSON() != final.GetJSON(), fail_extra)
 
     ; test ensure latest file
-    if (LC_FileSHA(transfer.src("ensure latest file.txt")) != LC_FileSHA(transfer.dest("ensure latest file.txt"))) {
-        log.err("'ensure latest file.txt' was not properly created")
-        return false
-    }
-
-    ; test ensure latest file modified
-    if (LC_FileSHA(transfer.src("ensure latest file modified.txt")) != LC_FileSHA(transfer.dest("ensure latest file modified.txt"))) {
-        log.err("'ensure latest file.txt' was not properly updated")
-        return false
-    }
+    assert("Create 'ensure latest file.txt'", (LC_FileSHA(transfer.src("ensure latest file.txt")) != LC_FileSHA(transfer.dest("ensure latest file.txt"))))
+    assert("Update 'ensure latest file.txt'", (LC_FileSHA(transfer.src("ensure latest file modified.txt")) != LC_FileSHA(transfer.dest("ensure latest file modified.txt"))))
 
     ; test ensure link
     FileGetShortcut % transfer.dest("windows directory.lnk"), link_target
-    if (link_target != "C:\Windows") {
-        log.err("'windows directory' was not properly created")
-        return false
-    }
+    assert("Create 'windows directory' shortcut", link_target != "C:\Windows")
 
-    ; test ensure present file
-    if (LC_FileSHA(transfer.src("ensure present file.txt")) != LC_FileSHA(transfer.dest("ensure present file.txt"))) {
-        log.err("'ensure present file.txt' was not properly created")
-        return false
-    }
+    ; test ensure present file and modification
+    assert("Create 'ensure present file.txt'", (LC_FileSHA(transfer.src("ensure present file.txt")) != LC_FileSHA(transfer.dest("ensure present file.txt"))))
+    assert("Test modify 'ensure present file.txt'", (LC_FileSHA(transfer.src("ensure present file modified.txt")) == LC_FileSHA(transfer.dest("ensure present file modified.txt"))))
 
-    ; test ensure present file modified
-    if (LC_FileSHA(transfer.src("ensure present file modified.txt")) == LC_FileSHA(transfer.dest("ensure present file modified.txt"))) {
-        log.err("'ensure present file.txt' was improperly modified")
-        return false
-    }
-
-    ; test ensure renaming dir
-    if ! InStr(FileExist(transfer.dest("ensure rename directory 2")), "D") {
-        log.err("'ensure rename directort 2' was not properly renamed")
-        return false
-    }
-
-    ; test ensure renaming file
-    if FileExist(transfer.dest("ensure duplicate directory 2\renamed.txt")) {
-        if (LC_FileSHA(transfer.dest("ensure duplicate directory\file.txt")) == LC_FileSHA(transfer.dest("ensure duplicate directory 2\renamed.txt"))) {
-            log.err("'ensure rename file' was not properly renamed")
-            return false
-        }
-    } else {
-        log.err("'ensure rename file' was not properly renamed")
-        return false
-    }
+    ; test ensure renaming directories and files
+    assert("Rename 'ensure rename directory 2'", ! InStr(FileExist(transfer.dest("ensure rename directory 2")), "D"))
+    assert("Rename 'ensure rename file'", ! FileExist(transfer.dest("ensure duplicate directory 2\renamed.txt")))
+    assert("Rename 'ensure rename file' (content)", (LC_FileSHA(transfer.dest("ensure duplicate directory\file.txt")) == LC_FileSHA(transfer.dest("ensure duplicate directory 2\renamed.txt"))))
 
     ; remove unnecesasry test data
     ; -------------------------------------------------------------------------
@@ -337,14 +255,14 @@ TestTransfer() {
 }
 
 ; entry point
-log.info("===================================")
-log.info("= {1} (v{2})", SELF, VERSION)
-log.info("===================================")
+log.crit("===================================")
+log.crit("= {1} (v{2})", SELF, VERSION)
+log.crit("===================================")
 
 ; run tests
 package_test := TestPackage()
-;github_test := TestGithub()
-;ini_config_test := TestIniConfig()
+github_test := TestGithub()
+ini_config_test := TestIniConfig()
 transfer_test := TestTransfer()
 
 exit

@@ -69,6 +69,12 @@ class Transfer {
     ComplexFile(complex_data, action) {
         this.log.debug("Performing complex action '{1}' on '{2}'", action, complex_data["Name"])
 
+        ; let the IniConfig class handle the content of the file
+        ; only ini files will have the Content field in their definition
+        if complex_data.HasKey("Content") {
+            return this.__DoIniConfig(complex_data, action)
+        }
+
         switch action
         {
             ; https://puppet.com/docs/puppet/latest/types/file.html#file-attribute-ensure
@@ -84,11 +90,6 @@ class Transfer {
                 this.log.error("Unknown action '{1}'", action)
                 return false
         }
-    }
-
-    ; TODO: go through and actually write to the INI files
-    ComplexWriteIni() {
-        ; may not be needed
     }
 
     ; ensure a path does not exist in the destination
@@ -110,6 +111,41 @@ class Transfer {
         } else {
             this.log.warn("Complex path '{1}' does not exist in destination", complex_data["Path"])
             return false
+        }
+    }
+
+    ; ensure an ini config is partially modified appropriately
+    __DoIniConfig(complex_data, action) {
+        ; work off the destination ini, this means the ini should be at least
+        ; transferred as present, if there's a concern about it not being in destination
+        path := this.dest(complex_data["Path"])
+        content := this.src(complex_data["Content"])
+        format := complex_data.HasKey("Format") ? complex_data["Format"] : 1
+
+        ; the full path is only needed for the IniConfig class
+        ini_config := new IniConfig(path)
+        ini_content := new IniConfig(content)
+
+        switch action
+        {
+            case "Absent":      modify_count := ini_config.DeleteConfig(ini_content)
+            case "Latest":      modify_count := ini_config.UpdateConfig(ini_content)
+            case "Present":     modify_count := ini_config.InsertConfig(ini_content)
+
+            default:
+                this.log.error("Unknown ini action '{1}'", action)
+                return false
+        }
+
+        ; use the partial path again within class
+        if ! this.__HasLatestContent(complex_data["Path"], ini_config) {
+            return this.__TransferIniConfig(complex_data["Path"], ini_config, format)
+        } else {
+            this.log.verb("Ini Config '{1}' already matches the content (format: {2})", complex_data["Path"], format)
+
+            if format
+                ini_config.__FormatIni()
+            return true
         }
     }
 
@@ -197,10 +233,12 @@ class Transfer {
     ; determines if the destination file already has the latest content
     ; when absent is true, it ensures the data is missing from the destination
     ; this only works for ini style config files
-    __HasLatestContent(path_name, valid_content, absent := 0) {
-        ; uses __WriteIni(dry_run = 1) determine change count
-        ; if change count > 0 then return false
-        ; valid_content is the ini_config object
+    __HasLatestContent(path_name, valid_content) {
+        ; perform a dry run
+        change_count := valid_content.__WriteIni(1)
+
+        this.log.verb("Ini config '{1}' has '{2}' pending changes", path_name, change_count)
+        return change_count == 0 ? true : false
     }
 
     ; delete a file or directory (recursive) on the destination
@@ -244,7 +282,12 @@ class Transfer {
     }
 
     ; ensures ini section/kvp exist or don't exist in the destination
-    __TransferIni(path_name, ini_content, absent := 0) {
+    __TransferIniConfig(path_name, ini_content, format := 1) {
+        ini_content.WriteConfig(format)
+        result := A_LastError
+
+        this.log.verb("[TI] Transferred '{1}' (error: {2})", path_name, result)
+        return result ? false : true
     }
 
     ; creates a shortcut in destination directory to another location
