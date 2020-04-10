@@ -1,2 +1,0 @@
-# example.txt
-# if a user changes the contents of this file, we should warn them

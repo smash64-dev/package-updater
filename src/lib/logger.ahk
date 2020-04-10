@@ -3,17 +3,27 @@
 class Logger {
     ; helps build methods like log.crit() and log.warn()
     static loglevels := {crit: [1, "C"], err:[2, "E"], warn:[3, "W"], info:[4, "I"], verb:[5, "V"], debug:[6, "D"]}
+    static verbosity := 0
 
     tag := ""
-    verbosity := 3
 
-    __New(tag := "") {
+    __New(tag := "", verbosity := 0) {
         this.tag := tag ? tag : A_ScriptName
         is_compiled := A_IsCompiled
 
+        for method, level in Logger.loglevels {
+            if (level[2] == verbosity and ! Logger.verbosity) {
+                Logger.verbosity := level[1]
+            }
+        }
+
         ; have a different verbosity level when compiled
-        if is_compiled {
-            this.verbosity := 3
+        if (! verbosity and ! Logger.verbosity) {
+            if is_compiled {
+                Logger.verbosity := 3
+            } else {
+                Logger.verbosity := 4
+            }
         }
     }
 

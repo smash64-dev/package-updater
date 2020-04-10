@@ -17,6 +17,10 @@ IF EXIST "%ProgramFiles%\AutoHotkey\Compiler\Ahk2Exe.exe" (
 
     ECHO - Creating config file...
     COPY "conf\example.cfg" "build\updater.cfg" >nul
+    COPY "conf\example.user.cfg" "build\user.cfg" >nul
+
+    ECHO - Copying Changelog...
+    COPY "CHANGELOG.md" "build\CHANGELOG.md" >nul
 
     ECHO - Finshed
     EXIT 0

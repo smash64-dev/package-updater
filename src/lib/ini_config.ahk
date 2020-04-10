@@ -52,6 +52,7 @@ class IniConfig {
         return change_count
     }
 
+    ; format the config to be cleaner and more consistent
     FormatConfig() {
         this.log.verb("Formatting config file '{1}'", this.config_file)
         return this.__FormatIni()

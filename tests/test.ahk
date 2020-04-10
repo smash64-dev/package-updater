@@ -5,7 +5,7 @@
 
 global SELF := "package-updater-tests"
 global VERSION := "1.0.0"
-global log := new Logger("tests.ahk")
+global log := new Logger("tests.ahk", "C")
 
 global app_directory := Format("{1}\{2}", A_AppData, SELF)
 global temp_directory := Format("{1}\{2}", A_Temp, SELF)
@@ -151,6 +151,7 @@ TestPackage() {
     complex_keys := package.GetComplexKeys()
     assert("Build complex keys", (! complex_keys.HasKey("Ensure_Directory") or ! complex_keys.HasKey("Ensure_Present_File")))
 
+    ; TODO check that file checksum is good ???
     assert("Backup()", "TODO")
 
     return true
@@ -177,6 +178,7 @@ TestTransfer() {
     ; create basic files in both source and destination
     ; -------------------------------------------------------------------------
     FileAppend, % "overwrite me", % transfer.dest("modified basic.txt")
+    FileCopy, % transfer.src("unchanged file.txt"), % transfer.dest("unchanged file.txt"), 1
 
     ; perform the basic transfer
     transfer.BasicFiles(complex_paths)
@@ -191,6 +193,12 @@ TestTransfer() {
 
     ; create complex files in both source and destination
     ; -------------------------------------------------------------------------
+
+    ; basic -> complex expects the directory tree to exist properly in destination
+    FileRemoveDir, % dest, 1
+    src_pattern := Format("{1}\*.*", src)
+    transfer.__CopyDirectoryTree(src_pattern)
+
     FileAppend, % "ensure absent file", % transfer.dest("ensure absent file.txt")
     FileCreateDir, % transfer.dest("ensure absent directory")
 
@@ -220,6 +228,7 @@ TestTransfer() {
     initial = new IniConfig(transfer.dest("ini config\initial.ini"))
     final = new IniConfig(transfer.dest("ini config\final.ini"))
     fail_extra := Format("test:'{1}' vs good:'{2}'", initial.GetJSON(), final.GetJSON())
+    assert("Ensure 'ini config' directory created", ! InStr(FileExist(transfer.dest("ini config")), "D"))
     assert("Ensure changing ini config data", initial.GetJSON() != final.GetJSON(), fail_extra)
 
     ; test ensure ini match

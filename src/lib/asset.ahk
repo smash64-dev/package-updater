@@ -110,8 +110,8 @@ class Asset {
             this.log.verb("Checksum for '{1}' matches", asset)
             return true
         } else {
-            this.log.error("Checksum for '{1}' does not match", asset)
-            this.log.error("Checksum values '{1}' vs '{2}'", asset_checksum, valid_checksum[1])
+            this.log.err("Checksum for '{1}' does not match", asset)
+            this.log.err("Checksum values '{1}' vs '{2}'", asset_checksum, valid_checksum[1])
             return false
         }
     }

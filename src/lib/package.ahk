@@ -24,15 +24,28 @@ class Package {
         SplitPath, updater_binary,, binary_path
         this.updater_config := updater_config != "" ? updater_config : Format("{1}\updater.cfg", binary_path)
 
+        ; load the base config and store it in the object
         ini_config := new IniConfig(this.updater_config)
         this.config_data := ini_config.GetData()
+
+        this.base_directory := this.__GetBaseDirectory(this.updater_binary, this.__GetSectionValue("Package", "Process", updater_binary))
+        override_config := this.__GetSectionValue("User", "Override", "")
+
+        ; if a user override config is defined and present, INSERT new values into the object
+        ; this will not overwrite existing values, consider updater.cfg read-only from this perspective
+        if FileExist(Format("{1}\{2}", this.base_directory, override_config)) {
+            user_config := new IniConfig(this.__GetFile(override_config))
+            ini_config.InsertConfig(user_config)
+
+            ; store the extra user data into the object
+            this.config_data := ini_config.GetData()
+        }
 
         ; HACK: useful for __Call
         for index, ini_section in ini_config.GetSections() {
             this.config_func[ini_section] := true
         }
 
-        this.base_directory := this.__GetBaseDirectory(this.updater_binary, this.package("Process", updater_binary))
         this.config_json := ini_config.GetJSON()
         this.log.verb("config_json: '{1}'", this.config_json)
     }
@@ -52,7 +65,7 @@ class Package {
     ; backs up package to a directory, with the option to trim old backups
     Backup(directory, keep_old := 0) {
         FormatTime, now,, yyyy-MM-dd-HHmmss
-        backup_zip := Format("{1}\backup-{2}-{3}.zip", directory, this.config_data["Package"]["Name"], now)
+        backup_zip := Format("{1}\backup-{2}-{3}.zip", directory, this.__GetSectionValue("Package", "Name"), now)
 
         this.log.info("Backing up '{1}' to '{2}'", this.base_directory, backup_zip)
         Zip(this.base_directory, backup_zip)
@@ -169,10 +182,10 @@ class Package {
             return this.config_data[section_name][key_name]
         } else {
             if (optional != "") {
-                this.log.warn("'{2}' was not found in [{1}] was not found, returning '{3}'", section_name, key_name, optional)
+                this.log.warn("'{2}' was not found in [{1}], returning '{3}'", section_name, key_name, optional)
                 return optional
             } else {
-                this.log.err("'{2}' was not found in [{1}] was not found, field required", section_name, key_name)
+                this.log.err("'{2}' was not found in [{1}], field required", section_name, key_name)
                 return false
             }
         }

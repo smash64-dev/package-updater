@@ -44,7 +44,7 @@ GetLatestPackage(old_updater) {
 	latest_directory := DownloadLatestPackage(old_package, github, temp_directory)
 
 	if latest_directory {
-		new_updater := Format("{1}\{2}", latest_directory, old_package.updater("Updater", "package-updater.exe"))
+		new_updater := Format("{1}\{2}", latest_directory, old_package.package("Updater", "package-updater.exe"))
 
 		; the latest updater exists, backup the old package, kill the process
 		; and run the second updater to transfer the files over to the current
@@ -89,18 +89,6 @@ SetLatestPackage(old_updater, new_updater) {
 			result := transfer.ComplexFile(complex_data, action)
 			log.info("Performed '{1}' on '{2}' (result: {3})", action, complex_data["Path"], result)
 		}
-
-		;rdb := new IniConfig(Format("{1}\Plugin\GLideN64.custom.ini", new_package.base_directory))
-		rdb := new IniConfig(Format("{1}\Project64.rdb", new_package.base_directory))
-		new_rdb := new IniConfig(Format("{1}\Tools\smash.rdb", new_package.base_directory))
-		rm_rdb := new IniConfig(Format("{1}\Tools\smash-remove.rdb", new_package.base_directory))
-
-		log.info(rdb.SetData(new_rdb, 0, 1))
-		log.info(rdb.SetData(rm_rdb, 1, 1))
-
-		rdb_adj := new IniConfig(Format("{1}\Project64.rdb", new_package.base_directory))
-		log.warn("{1} vs {2}, match: {3}", LC_SHA256(rdb.GetJSON()), LC_SHA256(rdb_adj.GetJSON()), LC_SHA256(rdb.GetJSON()) == LC_SHA256(rdb_adj.GetJSON()))
-		log.warn("{1}", rdb.GetJSON())
 	}
 }
 
