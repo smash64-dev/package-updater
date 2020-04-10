@@ -3,4 +3,5 @@
 build/
 log/
 release/
+src/*.cfg
 **.exe
