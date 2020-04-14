@@ -1,5 +1,8 @@
 ; include.ahk
 
+; gui handler
+#Include %A_LineFile%\..\gui.ahk
+
 ; first-party classes
 #Include %A_LineFile%\..\lib\asset.ahk
 #Include %A_LineFile%\..\lib\github.ahk

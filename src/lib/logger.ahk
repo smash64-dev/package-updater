@@ -5,6 +5,8 @@ class Logger {
     static loglevels := {crit: [1, "C"], err:[2, "E"], warn:[3, "W"], info:[4, "I"], verb:[5, "V"], debug:[6, "D"]}
     static verbosity := 0
 
+    last_level := ""
+    last_message := ""
     tag := ""
 
     __New(tag := "", verbosity := 0) {
@@ -35,6 +37,10 @@ class Logger {
 
     ; log message to DebugView (https://docs.microsoft.com/en-us/sysinternals/downloads/debugview)
     __logger(level, message := "", args*) {
+        ; store the last message we sent in case we ever need it
+        this.last_level := level[2]
+        this.last_message := Format(message, args*)
+
         if level[1] <= this.verbosity
             OutputDebug % Format("| {1} | {2} | {3}", level[2], this.tag, Format(message, args*))
     }

@@ -85,12 +85,17 @@ class Asset {
             return false
         }
 
-        if ! FileExist(checksum) {
+        if (algo != "None" and ! FileExist(checksum)) {
             this.log.err("Unable to find checksum '{1}'", checksum)
             return false
         }
 
         switch algo {
+            case "None": {
+                this.log.verb("No checksum requested for '{1}'", asset)
+                return true
+            }
+
             case "MD5": asset_checksum := LC_FileMD5(asset)
             case "SHA1": asset_checksum := LC_FileSHA(asset)
             case "SHA256": asset_checksum := LC_FileSHA256(asset)

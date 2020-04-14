@@ -78,6 +78,10 @@ class IniConfig {
         return this.data[section_name].HasKey(key_name)
     }
 
+    HasSection(section_name) {
+        return this.data.HasKey(section_name)
+    }
+
     ; add new sections and properties to the config
     InsertConfig(new_config, update := 0) {
         change_count := 0

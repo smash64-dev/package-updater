@@ -10,49 +10,29 @@ class Package {
 
     base_directory := ""
     complex_regex := "^Ensure_"
-    config_data := {}
-    config_func := {}
-    config_json := ""
+    main_config_path := ""
+    main_data := {}
+    main_ini := {}
     updater_binary := ""
-    updater_config := ""
+    user_config_path := ""
+    user_data := {}
+    user_ini := {}
 
-    __New(updater_binary, updater_config := "") {
+    __New(updater_binary, main_config := "") {
         plog := new Logger("package.ahk")
         this.log := plog
 
         this.updater_binary := updater_binary
         SplitPath, updater_binary,, binary_path
-        this.updater_config := updater_config != "" ? updater_config : Format("{1}\updater.cfg", binary_path)
+        this.main_config_path := main_config != "" ? main_config : Format("{1}\updater.cfg", binary_path)
 
-        ; load the base config and store it in the object
-        ini_config := new IniConfig(this.updater_config)
-        this.config_data := ini_config.GetData()
-
-        this.base_directory := this.__GetBaseDirectory(this.updater_binary, this.__GetSectionValue("Package", "Process", updater_binary))
-        override_config := this.__GetSectionValue("User", "Override", "")
-
-        ; if a user override config is defined and present, INSERT new values into the object
-        ; this will not overwrite existing values, consider updater.cfg read-only from this perspective
-        if FileExist(Format("{1}\{2}", this.base_directory, override_config)) {
-            user_config := new IniConfig(this.__GetFile(override_config))
-            ini_config.InsertConfig(user_config)
-
-            ; store the extra user data into the object
-            this.config_data := ini_config.GetData()
-        }
-
-        ; HACK: useful for __Call
-        for index, ini_section in ini_config.GetSections() {
-            this.config_func[ini_section] := true
-        }
-
-        this.config_json := ini_config.GetJSON()
-        this.log.verb("config_json: '{1}'", this.config_json)
+        this.main_ini := new IniConfig(this.main_config_path)
+        this.ReloadConfigFromDisk(1)
     }
 
     ; allows pull from different section of the config easier
     __Call(method, ByRef arg, args*) {
-        if this.config_func[method] {
+        if this.main_ini.HasSection(method) {
             return this.__GetSectionValue(method, arg, args*)
         } else if (method == "path") {
             directory := this.__GetDirectory(arg)
@@ -96,9 +76,9 @@ class Package {
     GetComplexKeys() {
         complex_hash := {}
 
-        for key, value in this.config_data {
+        for key, value in this.main_data {
             if RegExMatch(key, this.complex_regex) {
-                action := this.config_data[key]["Ensure"]
+                action := this.main_data[key]["Ensure"]
                 complex_hash[key] := action
             }
         }
@@ -110,26 +90,59 @@ class Package {
     GetComplexPaths() {
         complex_hash := {}
 
-        for key, value in this.config_data {
+        for key, value in this.main_data {
             if RegExMatch(key, this.complex_regex) {
-                path := this.config_data[key]["Path"]
+                path := this.main_data[key]["Path"]
                 complex_hash[path] := key
 
                 ; add target paths to complex paths
-                if this.config_data[key].HasKey("Target") {
-                    path := this.config_data[key]["Target"]
+                if this.main_data[key].HasKey("Target") {
+                    path := this.main_data[key]["Target"]
                     complex_hash[path] := key
                 }
 
                 ; add content paths to complex paths (ini)
-                if this.config_data[key].HasKey("Content") {
-                    path := this.config_data[key]["Content"]
+                if this.main_data[key].HasKey("Content") {
+                    path := this.main_data[key]["Content"]
                     complex_hash[path] := key
                 }
             }
         }
 
         return complex_hash
+    }
+
+    ReloadConfigFromDisk(update_original := 0) {
+        ; load the base config and store it in the object
+        this.main_ini.ReadConfig(update_original)
+        this.main_data := this.main_ini.GetData()
+
+        this.base_directory := this.__GetBaseDirectory(this.updater_binary, this.__GetSectionValue("Package", "Process", updater_binary))
+
+        ; we've already created a user object, just reload it
+        if (this.user_config_path and ! this.user_ini.Count()) {
+            this.user_ini.ReadConfig(update_original)
+            this.main_ini.InsertConfig(this.user_ini)
+
+            ; store the extra user data into the object
+            this.main_data := this.main_ini.GetData()
+        } else {
+            override_config := this.__GetSectionValue("User", "Override", "|")
+
+            ; if a user override config is defined and present, INSERT new values into the object
+            ; this will not overwrite existing values, consider updater.cfg read-only from this perspective
+            if (override_config != "|" && FileExist(Format("{1}\{2}", this.base_directory, override_config))) {
+                this.user_config_path := this.__GetFile(override_config)
+
+                this.user_ini := new IniConfig(this.user_config_path)
+                this.main_ini.InsertConfig(this.user_ini)
+
+                ; store the extra user data into the object
+                this.main_data := this.main_ini.GetData()
+            }
+        }
+
+        this.log.verb("config_json: '{1}'", this.main_ini.GetJSON())
     }
 
     __GetBaseDirectory(updater_binary, package_binary) {
@@ -178,8 +191,8 @@ class Package {
     ; grab values from the config, using this instead of something from IniConfig
     ; because we're using this directly in __Call to do object magic
     __GetSectionValue(section_name, key_name, optional := "") {
-        if this.config_data[section_name].Haskey(key_name) {
-            return this.config_data[section_name][key_name]
+        if this.main_data[section_name].Haskey(key_name) {
+            return this.main_data[section_name][key_name]
         } else {
             if (optional != "") {
                 this.log.warn("'{2}' was not found in [{1}], returning '{3}'", section_name, key_name, optional)

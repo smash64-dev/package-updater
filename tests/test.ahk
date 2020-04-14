@@ -5,10 +5,9 @@
 
 global SELF := "package-updater-tests"
 global VERSION := "1.0.0"
-global log := new Logger("tests.ahk", "C")
 
-global app_directory := Format("{1}\{2}", A_AppData, SELF)
-global temp_directory := Format("{1}\{2}", A_Temp, SELF)
+global APP_DIRECTORY := Format("{1}\{2}", A_AppData, SELF)
+global TEMP_DIRECTORY := Format("{1}\{2}", A_Temp, SELF)
 
 assert(description, test, fail_extra := "") {
     if (test == "TODO") {
@@ -28,7 +27,7 @@ assert(description, test, fail_extra := "") {
 }
 
 TestGithub() {
-    global temp_directory
+    global TEMP_DIRECTORY
     log.crit("=== Performing Github Tests ===")
 
     gh_owner := "smash64-dev"
@@ -39,7 +38,7 @@ TestGithub() {
 
     assert("Checking that stable and beta release URLS do not match", github_stable == github_beta)
 
-    github_beta.GetReleases(temp_directory)
+    github_beta.GetReleases(TEMP_DIRECTORY)
     package_url := github_beta.GetFileURL(Format("{1}.zip", gh_repo))
     checksum_url := github_beta.GetFileURL("sha1sum.txt")
 
@@ -49,23 +48,23 @@ TestGithub() {
 	asset := new Asset(Format("{1}.zip", gh_repo), package_url, checksum_url, "SHA1")
 
     ; test the internal methods individually
-    asset_path := asset.__DownloadFile(temp_directory, asset.asset_url)
-    checksum_path := asset.__DownloadFile(temp_directory, asset.checksum_url)
+    asset_path := asset.__DownloadFile(TEMP_DIRECTORY, asset.asset_url)
+    checksum_path := asset.__DownloadFile(TEMP_DIRECTORY, asset.checksum_url)
     assert("Downloaded asset data", (! FileExist(asset_path) or ! FileExist(checksum_path)))
 
     valid_asset := asset.__ValidateAsset(asset_path, checksum_path, "SHA1")
     assert("Validating asset", ! valid_asset)
 
     ; test the primary all-in-one method
-    FileRemoveDir, % temp_directory, 1
-	asset_location := asset.GetAsset(temp_directory)
+    FileRemoveDir, % TEMP_DIRECTORY, 1
+	asset_location := asset.GetAsset(TEMP_DIRECTORY)
     assert("Get and validate asset data", (! asset_location or ! FileExist(asset_location)))
 
     return true
 }
 
 TestIniConfig() {
-    global temp_directory
+    global TEMP_DIRECTORY
     log.crit("=== Performing IniConfig Tests ===")
 
     directory := Format("{1}\..\ini_config", A_LineFile)
@@ -135,12 +134,12 @@ TestIniConfig() {
 }
 
 TestPackage() {
-    global temp_directory
+    global TEMP_DIRECTORY
     log.crit("=== Performing Package Tests ===")
 
     package := new Package(A_LineFile, Format("{1}\..\..\conf\tests.cfg", A_LineFile))
 
-    assert("Package name", package.package("Name") != "package-updater-tests")
+    assert("Package name", package.Package("Name") != "package-updater-tests")
     assert("Invalid key default value", package.updater("Invalid", "default") != "default")
     assert("Path to 'README.md'", package.path("README.md") == "")
     assert("Path to invalid directory", package.path("invalid\dir\path") != 0)
@@ -151,6 +150,15 @@ TestPackage() {
     complex_keys := package.GetComplexKeys()
     assert("Build complex keys", (! complex_keys.HasKey("Ensure_Directory") or ! complex_keys.HasKey("Ensure_Present_File")))
 
+    ; test modifying and reloading data from the config
+    IniWrite, % "value", % package.main_config_path, % "brandnewsection", % "key"
+    package.ReloadConfigFromDisk()
+    assert("Add new key to config", package.brandnewsection("key") != "value")
+
+    IniDelete, % package.main_config_path, % "brandnewsection"
+    package.ReloadConfigFromDisk()
+    assert("Remove new key from config", package.main_ini.HasSection("brandnewsection"))
+
     ; TODO check that file checksum is good ???
     assert("Backup()", "TODO")
 
@@ -158,7 +166,7 @@ TestPackage() {
 }
 
 TestTransfer() {
-    global temp_directory
+    global TEMP_DIRECTORY
     log.crit("=== Performing Transfer Tests ===")
 
     ; this should already be verified
@@ -212,7 +220,7 @@ TestTransfer() {
 
     ; perform the complex transfer
     for complex, action in package.GetComplexKeys() {
-	    complex_data := package.config_data[complex]
+	    complex_data := package.main_data[complex]
 		result := transfer.ComplexFile(complex_data, action)
 	}
 
@@ -264,6 +272,7 @@ TestTransfer() {
 }
 
 ; entry point
+global log := new Logger("tests.ahk", "C")
 log.crit("===================================")
 log.crit("= {1} (v{2})", SELF, VERSION)
 log.crit("===================================")

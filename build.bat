@@ -13,7 +13,7 @@ IF EXIST "%ProgramFiles%\AutoHotkey\Compiler\Ahk2Exe.exe" (
     MKDIR "build"
 
     ECHO - Building to 'build' directory...
-    "%ProgramFiles%\AutoHotkey\Compiler\Ahk2Exe.exe" /in "src\updater.ahk" /out "build\package-updater.exe" /icon "res\icon.ico"
+    "%ProgramFiles%\AutoHotkey\Compiler\Ahk2Exe.exe" /in "src\updater.ahk" /out "build\package-updater.exe" /icon "res\icon.ico" /cp 65001
 
     ECHO - Creating config file...
     COPY "conf\example.cfg" "build\updater.cfg" >nul

@@ -1,5 +1,9 @@
 # Changelog
 
+## [0.0.3] - 2020-04-13
+
+- Dummy release for testing
+
 ## [0.0.2] - 2020-04-09
 
 - Dummy release for testing
@@ -9,5 +13,6 @@
 - Dummy release for testing
 
 
+[0.0.3]: https://github.com/smash64-dev/package-updater/releases/tag/v0.0.3
 [0.0.2]: https://github.com/smash64-dev/package-updater/releases/tag/v0.0.2
 [0.0.1]: https://github.com/smash64-dev/package-updater/releases/tag/v0.0.1

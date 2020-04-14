@@ -11,7 +11,6 @@ class GitHub {
     github_repo := ""
     json_payload := ""
     latest_build := {}
-    latest_build_id := 1
     release_url := ""
     wants_beta := false
 
@@ -48,7 +47,7 @@ class GitHub {
                 this.log.verb("Asset '{1}' url found: '{2}'", file_name, asset_url)
                 return asset_url
             } else {
-                this.log.debug("Asset '{1}' does not match", current_name)
+                this.log.debug("Asset '{1}' does not match '{2}'", current_name, file_name)
             }
         } until !assets[A_Index].id
 
@@ -82,8 +81,8 @@ class GitHub {
         }
     }
 
-    ; returns the array id of the latest build from the JSON data
-    __GetLatestBuildId() {
+    ; stores the hash of the latest build from the JSON data
+    __GetLatestBuild() {
         build_list := {}
         build_tags := ""
 
@@ -95,9 +94,16 @@ class GitHub {
 
         Sort build_tags, CLR
         builds_array := StrSplit(build_tags, "`n")
-        latest_id := builds_array[1]
+        latest_tag := builds_array[1]
+        latest_build_id := build_list[latest_tag]
 
-        return build_list[latest_id]
+        if this.json_payload.HasKey(latest_build_id) {
+            this.log.verb("Latest build id '{1}' found with tag '{2}'", latest_build_id, latest_tag)
+            this.latest_build := this.json_payload[latest_build_id]
+            return true
+        } else {
+            return false
+        }
     }
 
     ; load the API results into a JSON object
@@ -109,17 +115,15 @@ class GitHub {
                 try {
                     if this.wants_beta {
                         this.json_payload := JSON.Load(json_str)
-                        this.latest_build_id := this.__GetLatestBuildId()
+                        this.__GetLatestBuild()
                     } else {
                         this.json_payload := JSON.Load("[" . json_str . "]")
-                        this.latest_build_id := 1
+                        this.__GetLatestBuild()
                     }
                 } catch err {
                     this.log.err("Unable to read JSON data: (error: {1})", err)
                     return false
                 }
-
-                this.latest_build := this.json_payload[this.latest_build_id]
             } else {
                 this.log.err("Could not read JSON file '{1}'", json_file)
                 return false
