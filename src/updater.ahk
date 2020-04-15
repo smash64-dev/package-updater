@@ -13,12 +13,30 @@ global TEMP_DIRECTORY := Format("{1}\{2}", A_Temp, SELF)
 
 BackupOldPackage() {
 	global
+
 	OLD_PACKAGE.Backup(APP_DIRECTORY, OLD_PACKAGE.updater("Backups", "10"))
+}
+
+CleanVersionString(version_text) {
+	global
+
+	; this regex is not the recommeneded regex for semver, but it will work well enough for basic
+	; https://semver.org/#is-there-a-suggested-regular-expression-regex-to-check-a-semver-string
+    RegExMatch(version_text, "^v?(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*).*$", SemVer)
+	clean_text := Format("v{1}.{2}.{3}", SemVer1, SemVer2, SemVer3)
+
+	; minimum string length: v0.0.0 (6)
+	if (StrLen(clean_text) < 6)
+		return false
+	else
+		return clean_text
 }
 
 GetLatestChangelog() {
 	global
-    local github_api := new GitHub(OLD_PACKAGE.updater("Owner"), OLD_PACKAGE.updater("Repo"), OLD_PACKAGE.updater("Beta", "0"))
+
+	local github_auth := OLD_PACKAGE.updater("ApiAuth", false) ? OLD_PACKAGE.updater("ApiAuth", false) : ""
+    local github_api := new GitHub(OLD_PACKAGE.updater("Owner"), OLD_PACKAGE.updater("Repo"), OLD_PACKAGE.updater("Beta", "0"), github_auth)
 	local changelog_text := ""
 
 	if github_api.GetReleases(TEMP_DIRECTORY) {
@@ -29,7 +47,7 @@ GetLatestChangelog() {
 			local changelog_asset := new Asset(changelog_file, github_api.GetFileURL(changelog_file), "", "None")
 			local changelog_path := changelog_asset.GetAsset(TEMP_DIRECTORY)
 
-			if FileExist(changelog_path) {
+			if (changelog_path and FileExist(changelog_path)) {
 				FileRead, changelog_text, % changelog_path
 			} else {
 				log.err("Unable to download or find changelog asset from '{1}'", github_api.GetFileURL(changelog_file))
@@ -49,7 +67,9 @@ GetLatestChangelog() {
 
 GetLatestPackage() {
 	global
-    local github_api := new GitHub(OLD_PACKAGE.updater("Owner"), OLD_PACKAGE.updater("Repo"), OLD_PACKAGE.updater("Beta", 0))
+
+	local github_auth := OLD_PACKAGE.updater("ApiAuth", false) ? OLD_PACKAGE.updater("ApiAuth", false) : ""
+    local github_api := new GitHub(OLD_PACKAGE.updater("Owner"), OLD_PACKAGE.updater("Repo"), OLD_PACKAGE.updater("Beta", "0"), github_auth)
 
 	if github_api.GetReleases(TEMP_DIRECTORY) {
 		local package_file := OLD_PACKAGE.updater("PackageFile")
@@ -65,7 +85,12 @@ GetLatestPackage() {
 
 				if FileExist(new_updater) {
 					NEW_PACKAGE := new Package(new_updater)
-					return true
+
+					local latest_version := github_api.latest_build.tag_name
+					log.info("New version found, tag name '{1}'", latest_version)
+					return latest_version
+				} else {
+					log.crit("Unable to find new updater '{1}'", new_updater)
 				}
 			} else {
 				log.crit("Unable to download or verify package asset from '{1}'", github_api.GetFileURL(package_file))
@@ -80,15 +105,36 @@ GetLatestPackage() {
 	return false
 }
 
-IsLatestNewer() {
+; check to see if the unique id of NEW_PACKAGE is different from OLD_PACKAGE
+;
+; we don't ACTUALLY care if the version is technically newer or older; versions are
+; controlled on github (or another service) and whichever is considered the latest on
+; server-side is what we want; this will also prevent users from changing version strings
+; to subvert getting newer builds; unique ids can be generated through git archive
+IsLatestDifferent(latest_version) {
 	global
-	; TODO: version check
+
+	; default to version strings if unique ids don't exist
+	old_version := CleanVersionString(OLD_PACKAGE.package("Version", "0.0.0"))
+	new_version := CleanVersionString(latest_version)
+
+	old_unique := OLD_PACKAGE.package("UniqueId", false)
+	new_unique := NEW_PACKAGE.package("UniqueId", false)
+
+	if (! old_unique or ! new_unique) {
+		log.warn("Unable to determine unique IDs, reverting to version checks")
+		log.info("Comparing old_version '{1}' to new_version '{2}'", old_version, new_version)
+		return old_version != new_version
+	} else {
+		log.info("Comparing old_unique '{1}' to new_unique '{2}'", old_unique, new_unique)
+		return old_unique != new_unique
+	}
 }
 
 KillPackageProcess() {
 	global
-	local package_process := OLD_PACKAGE.package("Process")
 
+	local package_process := OLD_PACKAGE.package("Process")
 	log.info("Killing process from package '{1}'", package_process)
 	Process, Close, % package_process
 }
@@ -96,7 +142,8 @@ KillPackageProcess() {
 NonInteractiveUpdate() {
 	global
 
-	if GetLatestPackage() {
+	local latest_package := GetLatestPackage()
+	if IsLatestDifferent(latest_package) {
 		BackupOldPackage()
 		KillPackageProcess()
 		RunNewPackage()
@@ -105,8 +152,18 @@ NonInteractiveUpdate() {
 	}
 }
 
+QuietUpdateCheck() {
+	global
+
+	local latest_package := GetLatestPackage()
+	if IsLatestDifferent(latest_package) {
+		; TODO: launch message box (gui)
+	}
+}
+
 RunNewPackage() {
 	global
+
 	local new_updater := NEW_PACKAGE.updater_binary
 	local old_updater := OLD_PACKAGE.updater_binary
 
@@ -126,6 +183,7 @@ RunNewPackage() {
 
 UpdatePackage() {
 	global
+
 	; TODO: finish phase 2
 }
 
@@ -180,6 +238,13 @@ switch A_Args[1] {
 		log.info("Bypassing main dialog and running update")
 		global OLD_PACKAGE := new Package(A_ScriptFullPath)
 		NonInteractiveUpdate()
+
+	; check for updates quietly, and only notify the user if
+	; there is a new update, this is ignorable via user config
+	case "-q":
+		log.info("Quietly checking for updates")
+		global OLD_PACKAGE := new Package(A_ScriptFullPath)
+		QuietUpdateCheck()
 
 	; display version information
 	case "-v":

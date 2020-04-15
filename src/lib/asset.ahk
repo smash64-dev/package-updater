@@ -35,7 +35,9 @@ class Asset {
 
         ; download the asset and checksum, then validate it
         asset_path := this.__DownloadFile(directory, this.asset_url)
-        checksum_path := this.__DownloadFile(directory, this.checksum_url)
+
+        if this.checksum_url
+            checksum_path := this.__DownloadFile(directory, this.checksum_url)
 
         if this.__ValidateAsset(asset_path, checksum_path, this.checksum_type) {
             if InStr(this.asset_name, ".zip")

@@ -127,13 +127,14 @@ class Package {
             ; store the extra user data into the object
             this.main_data := this.main_ini.GetData()
         } else {
-            override_config := this.__GetSectionValue("User", "Override", "|")
+            override_config := this.__GetSectionValue("User", "Override", false)
+            SplitPath, override_config,, override_dir
 
             ; if a user override config is defined and present, INSERT new values into the object
             ; this will not overwrite existing values, consider updater.cfg read-only from this perspective
-            if (override_config != "|" && FileExist(Format("{1}\{2}", this.base_directory, override_config))) {
-                this.user_config_path := this.__GetFile(override_config)
-
+            ; this will create an override config if the parent directory exists
+            if (override_config and this.__GetDirectory(override_dir)) {
+                this.user_config_path := Format("{1}\{2}", this.base_directory, override_config)
                 this.user_ini := new IniConfig(this.user_config_path)
                 this.main_ini.InsertConfig(this.user_ini)
 
@@ -143,6 +144,42 @@ class Package {
         }
 
         this.log.verb("config_json: '{1}'", this.main_ini.GetJSON())
+    }
+
+    ; writes a property to the user file, if possible
+    UpdateUserProperty(section_name, key_name, value) {
+        if (this.__CanUpdateUserProperty(section_name, key_name)) {
+            this.log.verb("Writing '{1}.{2}' = '{3}' to user config", section_name, key_name, value)
+
+            this.user_ini.__UpdateProperty(section_name, key_name, value)
+            this.user_ini.WriteConfig(1)
+            this.ReloadConfigFromDisk()
+
+            if (this.user_ini.data[section_name][key_name] == value) {
+                return true
+            } else {
+                this.log.warn("'{1}.{2}' did not appear to update in user config", section_name, key_name)
+                return false
+            }
+        } else {
+            this.log.warn("Property '{1}.{2}' is not user configurable", section_name, key_name)
+            return false
+        }
+    }
+
+    ; determine if the main config already has a key present
+    __CanUpdateUserProperty(section_name, key_name) {
+        if (! this.__HasUserConfig()) {
+            this.log.warn("Cannot update user property '{1}.{2}', no user config", section_name, key_name)
+            return false
+        }
+
+        if (JSON.Load(this.main_ini.original_data)[section_name][key_name]) {
+            this.log.warn("Cannot update user property '{1}.{2}' exists in main config", section_name, key_name)
+            return false
+        }
+
+        return true
     }
 
     __GetBaseDirectory(updater_binary, package_binary) {
@@ -194,7 +231,7 @@ class Package {
         if this.main_data[section_name].Haskey(key_name) {
             return this.main_data[section_name][key_name]
         } else {
-            if (optional != "") {
+            if (optional or StrLen(optional) > 0) {
                 this.log.warn("'{2}' was not found in [{1}], returning '{3}'", section_name, key_name, optional)
                 return optional
             } else {
@@ -202,5 +239,9 @@ class Package {
                 return false
             }
         }
+    }
+
+    __HasUserConfig() {
+        return (FileExist(this.user_config_path) and this.user_ini.config_file)
     }
 }

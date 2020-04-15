@@ -6,6 +6,11 @@
 class GitHub {
     static ghlog := {}
 
+    ; basic auth should only be used for development
+    ; if a user is hitting github more than 60x an hour
+    ; they are not using this tool correctly
+    basic_auth := ""
+
     github_api := "https://api.github.com"
     github_owner := ""
     github_repo := ""
@@ -14,7 +19,7 @@ class GitHub {
     release_url := ""
     wants_beta := false
 
-    __New(github_owner, github_repo, wants_beta) {
+    __New(github_owner, github_repo, wants_beta, basic_auth := "") {
         ghlog := new Logger("github.ahk")
         this.log := ghlog
 
@@ -25,6 +30,7 @@ class GitHub {
             this.github_owner := github_owner
             this.github_repo := github_repo
             this.wants_beta := wants_beta
+            this.basic_auth := basic_auth
         } else {
             this.log.err("Unable to determine release_url: '{1}' '{2}' (beta: {3})", github_owner, github_repo, wants_beta)
             return false
@@ -60,13 +66,14 @@ class GitHub {
             FileCreateDir % directory
             this.log.verb("Created temp directory '{1}' (error: {2})", directory, A_LastError)
 
-            ; HACK: FileAppend triggers an error code of ERROR_ALREADY_EXISTS but works anyway
+            ; HACK: FileCreateDir triggers an error code of ERROR_ALREADY_EXISTS but works anyway
             ; trigger a quick noop-style command to reset A_LastError
             FileGetAttrib, noop, % A_LineFile
         }
 
         release_json := Format("{1}\{2}-{3}.json", directory, this.github_owner, this.github_repo)
-        UrlDownloadToFile % this.release_url, % release_json
+        FileDelete, % release_json
+        this.__DownloadToFile(this.release_url, release_json)
         result := A_LastError
 
         if ! A_LastError {
@@ -77,6 +84,26 @@ class GitHub {
             return this.__LoadJSON(release_json)
         } else {
             this.log.err("There was an error downloading '{1}' to '{2}' (error: {3})", release_json, directory, result)
+            return false
+        }
+    }
+
+    __DownloadToFile(url, path) {
+        local whr := ComObjCreate("WinHttp.WinHttpRequest.5.1")
+        whr.Open("GET", url, true)
+
+        if this.basic_auth {
+            this.log.info("Basic authorization found, adding header")
+            whr.SetRequestHeader("Authorization", Format("Basic {1}", this.basic_auth))
+        }
+        whr.Send()
+        whr.WaitForResponse()
+
+        FileAppend, % whr.ResponseText, % path
+        if whr.Status == "200" {
+            return true
+        } else {
+            this.log.warn("{1} {2} - {3}", whr.Status, whr.StatusText, whr.ResponseText)
             return false
         }
     }

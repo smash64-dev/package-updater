@@ -33,8 +33,8 @@ TestGithub() {
     gh_owner := "smash64-dev"
     gh_repo := "package-updater"
 
-    github_stable := new Github(gh_owner, gh_repo, 0)
-    github_beta := new Github(gh_owner, gh_repo, 1)
+    github_stable := new GitHub(gh_owner, gh_repo, 0)
+    github_beta := new GitHub(gh_owner, gh_repo, 1)
 
     assert("Checking that stable and beta release URLS do not match", github_stable == github_beta)
 

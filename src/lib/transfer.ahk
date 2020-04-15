@@ -389,6 +389,8 @@ class Transfer {
         else
             link_path := Format("{1}.lnk", this.dest(link_name))
 
+        ; always delete the shortcut before creating it
+        FileDelete % link_path
         FileCreateShortcut, % target_path, % link_path
         result := A_LastError
 

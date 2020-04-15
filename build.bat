@@ -16,8 +16,8 @@ IF EXIST "%ProgramFiles%\AutoHotkey\Compiler\Ahk2Exe.exe" (
     "%ProgramFiles%\AutoHotkey\Compiler\Ahk2Exe.exe" /in "src\updater.ahk" /out "build\package-updater.exe" /icon "res\icon.ico" /cp 65001
 
     ECHO - Creating config file...
-    COPY "conf\example.cfg" "build\updater.cfg" >nul
-    COPY "conf\example.user.cfg" "build\user.cfg" >nul
+    COPY "src\updater.cfg" "build\updater.cfg" >nul
+    COPY "src\user.cfg" "build\user.cfg" >nul
 
     ECHO - Copying Changelog...
     COPY "CHANGELOG.md" "build\CHANGELOG.md" >nul
