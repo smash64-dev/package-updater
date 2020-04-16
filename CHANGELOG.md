@@ -1,5 +1,9 @@
 # Changelog
 
+## [0.0.6] - 2020-04-15
+
+- Dummy release for testing
+
 ## [0.0.5] - 2020-04-15
 
 - Dummy release for testing

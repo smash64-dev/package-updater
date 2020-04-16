@@ -126,14 +126,14 @@ GetLatestPackage() {
 IsCurrentLatest(latest_version) {
     global
 
-    local old_id := OLD_PACKAGE.package("BuildId", OLD_PACKAGE.package("UniqueId", false))
+    local old_id := OLD_PACKAGE.package("BuildId", false)
     local old_version := CleanVersionString(OLD_PACKAGE.package("Version", "0.0.0"))
 
-    local new_id := NEW_PACKAGE.package("BuildId", NEW_PACKAGE.package("UniqueId", false))
+    local new_id := NEW_PACKAGE.package("BuildId", false)
     local new_version := CleanVersionString(latest_version)
 
     if (! old_build_id or ! new_build_id) {
-        log.warn("Unable to determine unique IDs, reverting to version checks")
+        log.warn("Unable to determine build IDs, reverting to version checks")
         old_id := old_version
         new_id := new_version
     }
@@ -162,6 +162,7 @@ NonInteractiveUpdate() {
         RunNewPackage()
     } else {
         MsgBox, Package Updater, Unable to update package
+        ExitApp
     }
 }
 
@@ -203,6 +204,7 @@ UpdatePackage() {
     global
 
     MsgBox, Package Updater, This is Phase #2
+    ExitApp
 }
 
 ; phase 2
@@ -229,7 +231,7 @@ SetLatestPackage(old_updater, new_updater) {
 }
 
 ; entry point
-global log := new Logger("updater.ahk")
+global log := new Logger("updater.ahk", "V")
 log.info("===================================")
 log.info("= {1} (v{2})", SELF, VERSION)
 log.info("===================================")
@@ -264,11 +266,11 @@ switch A_Args[1] {
         About_Dialog(1)
 
     default:
-		if A_Args[2] {
+		if FileExist(A_Args[1]) {
 			; execute phase 2 of the update process
 			log.info("Executing phase 2 of the update process")
 			global NEW_PACKAGE := new Package(A_ScriptFullPath)
-			global OLD_PACKAGE := new Package(A_Args[2])
+			global OLD_PACKAGE := new Package(A_Args[1])
 			UpdatePackage()
 		} else {
 			; standard update process, launch update dialog first
