@@ -138,7 +138,7 @@ IsCurrentLatest(latest_version) {
         new_id := new_version
     }
 
-    log.info("Comparing old: '{1}' vs new: '{2}' (result: {3}", old_id, new_id, old_id == new_id)
+    log.info("Comparing old: '{1}' vs new: '{2}' (result: {3})", old_id, new_id, old_id == new_id)
     return old_id == new_id
 }
 

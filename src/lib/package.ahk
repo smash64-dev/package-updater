@@ -117,7 +117,10 @@ class Package {
         this.main_ini.ReadConfig(update_original)
         this.main_data := this.main_ini.GetData()
 
-        this.base_directory := this.__GetBaseDirectory(this.updater_binary, this.__GetSectionValue("Package", "Process", updater_binary))
+        ; package_binary can be defined with a BaseFile value, if not drop
+        ; to the package process or updater binary
+        package_binary := this.__GetSectionValue("Package", "BaseFile", this.__GetSectionValue("Package", "Process", this.updater_binary))
+        this.base_directory := this.__GetBaseDirectory(this.updater_binary, package_binary)
 
         ; we've already created a user object, just reload it
         if (this.user_config_path and ! this.user_ini.Count()) {
