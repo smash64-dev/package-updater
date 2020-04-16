@@ -221,7 +221,7 @@ class Transfer {
 
             case "L":
                 if this.__VerifyStruct(complex_data, ["Path", "Target"])
-                    return this.__TransferLink(complex_data["Path"], complex_data["Target"])
+                    return this.__TransferLink(complex_data)
                 else
                     return false
 
@@ -383,7 +383,16 @@ class Transfer {
     }
 
     ; creates a shortcut in destination directory to another location
-    __TransferLink(link_name, target_path) {
+    __TransferLink(complex_data) {
+        link_name := complex_data["Path"] ? complex_data["Path"] : false
+        target_path := complex_data["Target"] ? complex_data["Target"] : false
+        working_dir := complex_data["WorkingDir"] ? complex_data["WorkingDir"] : ""
+        args := complex_data["Arguments"] ? complex_data["Arguments"] : ""
+        description := complex_data["Description"] ? complex_data["Description"] : ""
+        icon_file := complex_data["Icon"] ? complex_data["Icon"] : ""
+        icon_no := complex_data["IconNumber"] ? complex_data["IconNumber"] : ""
+        run_state := complex_data["RunState"] ? complex_data["RunState"] : ""
+
         if RegExMatch(link_name, "$.*[.]lnk$")
             link_path := this.dest(link_name)
         else
@@ -391,7 +400,7 @@ class Transfer {
 
         ; always delete the shortcut before creating it
         FileDelete % link_path
-        FileCreateShortcut, % target_path, % link_path
+        FileCreateShortcut, % target_path, % link_path, % working_dir, % args, % description, % icon_file,, % icon_no, % run_state
         result := A_LastError
 
         this.log.verb("[TL] Transferred '{1}' (error: {2})'", link_name, result)

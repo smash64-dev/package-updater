@@ -3,7 +3,7 @@
 About_Dialog(about_only := 0) {
     global
 
-    local title := "About Package Updater"
+    local title := "About"
     local version_text := Format("{1} — v{2}", SELF ? SELF : "package-updater", VERSION ? VERSION : "0.0.0")
     local description_text := "Generic zip package update utility written in AutoHotkey"
     local author_text := Format("Copyright: {1}", AUTHOR ? AUTHOR : "Unknown")
@@ -134,7 +134,7 @@ Check_For_Updates() {
         return false
     }
 
-    if IsLatestDifferent(latest_version) {
+    if ! IsCurrentLatest(latest_version) {
         if package_name
             header := Format("{1} has a new version available!", package_name)
         else
@@ -173,9 +173,13 @@ Check_For_Updates() {
 Main_Dialog() {
     global
 
-    local title := Format("Package Updater — v{1}", VERSION ? VERSION : "0.0.0")
+    local title := Format("{1} — v{2}", SELF ? SELF : "package-updater", VERSION ? VERSION : "0.0.0")
     local exe_path := OLD_PACKAGE.path(OLD_PACKAGE.package("Process"))
-    local exe_icon := LoadPicture(A_IsCompiled ? exe_path : "AutoHotkey.exe", "w64 h64 Icon1")
+
+    local icon_no := OLD_PACKAGE.gui("IconNumber", "1")
+    local icon_res := "64"
+    local icon_data := Format("w{1} h{1} Icon{2}", icon_res, icon_no)
+    local exe_icon := LoadPicture(A_IsCompiled ? exe_path : "AutoHotkey.exe", icon_data)
 
     local header_text := ""
     local description_text := ""
@@ -246,13 +250,49 @@ Main_Dialog() {
 
     ; reapply the update from this version
     MainButtonRerunUpdate:
+        Run_Update(1)
         return
 
     ; update to the latest version
     MainButtonUpdate:
+        Run_Update()
         return
 
     MainGuiClose:
         Gui, Main:Destroy
+        ExitApp
+}
+
+Run_Update(rerun := 0) {
+    global
+
+    if rerun {
+        local ask_title := "Are you sure?"
+        local ask_text := "FIXME: Running this will update your emulator, but keep your ROMs, and reapply any settings etc etc"
+    } else {
+        local ask_title := "Are you sure?"
+        local ask_text := "FIXME: Running this will update your emulator, but keep your ROMs etc etc"
+    }
+
+    MsgBox, % (0x4 | 0x30 | 0x100 | 0x2000), % ask_title, % ask_text
+    IfMsgBox, No
+        return false
+
+    BackupOldPackage()
+    KillPackageProcess()
+    RunNewPackage()
+    return true
+}
+
+Update_Available_Dialog(latest_version) {
+    global
+
+    local update_title := Format("{1} — v{2}", SELF ? SELF : "package-updater", VERSION ? VERSION : "0.0.0")
+    local update_text := Format("FIXME: A new version is available, want to download it?")
+
+    MsgBox, % (0x4 | 0x30 | 0x100 | 0x2000), % update_title, % update_text
+    IfMsgBox, Yes
+        Main_Dialog()
+    IfMsgBox, No
         ExitApp
 }

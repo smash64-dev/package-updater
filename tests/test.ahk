@@ -159,7 +159,6 @@ TestPackage() {
     package.ReloadConfigFromDisk()
     assert("Remove new key from config", package.main_ini.HasSection("brandnewsection"))
 
-    ; TODO check that file checksum is good ???
     assert("Backup()", "TODO")
 
     return true
@@ -278,9 +277,9 @@ log.crit("= {1} (v{2})", SELF, VERSION)
 log.crit("===================================")
 
 ; run tests
-package_test := TestPackage()
-github_test := TestGithub()
-ini_config_test := TestIniConfig()
+;package_test := TestPackage()
+;github_test := TestGithub()
+;ini_config_test := TestIniConfig()
 transfer_test := TestTransfer()
 
 exit
