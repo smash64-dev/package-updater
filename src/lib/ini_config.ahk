@@ -240,9 +240,11 @@ class IniConfig {
                 {
                     property := StrSplit(A_LoopField, "=")
                     key := Trim(property[1])
-                    value := Trim(property[2])
 
+                    ; find everything after the first '='
+                    value := Trim(SubStr(A_LoopField, InStr(A_LoopField, property[2])))
                     ref_data[section_name][key] := value
+
                     this.log.debug("Adding property '{1}.{2}' = '{3}'", section_name, key, value)
                 }
             }

@@ -14,4 +14,6 @@
 ; third-party libraries
 #Include %A_LineFile%\..\ext\json.ahk
 #Include %A_LineFile%\..\ext\libcrypt.ahk
+#Include %A_LineFile%\..\ext\msgboxex.ahk
+#Include %A_LineFile%\..\ext\taskdialogex.ahk
 #Include %A_LineFile%\..\ext\zip.ahk

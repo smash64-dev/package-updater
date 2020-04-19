@@ -94,6 +94,65 @@ Beta_Warning_Dialog() {
     }
 }
 
+Change_Notification_Dialog(complex_data, remember := 0) {
+    global
+
+    switch complex_data["Ensure"] {
+        case "Absent":      verb := "remove"
+        case "Directory":   verb := "create"
+        case "Duplicate":   verb := "copy"
+        case "Latest":      verb := "update"
+        case "Link":        verb := "create"
+        case "Present":     verb := "create"
+        case "Rename":      verb := "move"
+        default:            verb := "update"
+    }
+
+    switch complex_data["Type"] {
+        case "Ini":         verb_extra := " part of "
+        default:            verb_extra := ""
+    }
+
+    title := Format("{1} — v{2}", SELF ? SELF : "package-updater", VERSION ? VERSION : "0.0.0")
+    allow := "Yes", deny := "No", okay := "OK"
+
+    switch complex_data["Notify"] {
+        case "Ask":
+            ask_tell := "Do you want to make this change?"
+            button_text := Format("{1}|{2}", allow, deny)
+
+        case "Tell":
+            ask_tell := "This change is required."
+            button_text := Format("{1}", okay)
+            remember := ""
+    }
+
+    check_text := remember ? "Remember my choice" : ""
+
+    if (A_OSVersion == "WIN_XP" or A_OSVersion == "WIN_2000") {
+        message_format := "{1} would like to {2}{3} your {4} ({5}).`n`n{6}"
+        message := Format(message_format, NEW_PACKAGE.gui("Name", SELF ? SELF : "package-updater"), verb, verb_extra, complex_data["Name"], complex_data["Path"], ask_tell)
+
+        response := MsgBoxEx(message, title, button_text, 5, check_text, "-SysMenu")
+    } else {
+        message_format := "{1} would like to {2}{3} your {4} ({5})."
+        message := Format(message_format, NEW_PACKAGE.gui("Name", SELF ? SELF : "package-updater"), verb, verb_extra, complex_data["Name"], complex_data["Path"])
+        message_2 := Format("{1}", ask_tell)
+        reason := complex_data["Reason"] ? complex_data["Reason"] : ""
+
+        result := TaskDialogDirect(message, message_2, title, button_text, 101, 0xFFFD, 0x40, check_text, reason, "Less Info", "More Info", 1)
+        response := result[1]
+        check_text := result[2]
+    }
+
+    switch response {
+        case allow:     return [1, check_text == 1 ? true : false]
+        case deny:      return [0, check_text == 1 ? true : false]
+        case okay:      return [1, false]
+        default:        return [1, false]
+    }
+}
+
 Check_For_Updates() {
     global
 

@@ -166,6 +166,31 @@ NonInteractiveUpdate() {
     }
 }
 
+; ask or tell the user about the updater change
+NotifyCallback(complex_data) {
+    global
+
+    local show_remember := NEW_PACKAGE.gui("ShowRemember", 0)
+    local response := Change_Notification_Dialog(complex_data, show_remember)
+
+    local answer := response[1]
+    local remember := response[2]
+    local remember_value := answer ? "Allow" : "Deny"
+    log.verb("User response: answer: '{1}' and remember: '{2}' ({3})", answer, remember, remember_value)
+
+    if (complex_data["Notify"] == "Tell") {
+        log.verb("Notify was 'Tell': Allow action")
+        return answer
+    }
+
+    if (complex_data["Notify"] == "Ask" and remember) {
+        NEW_PACKAGE.UpdateUserProperty(complex_data["__SectionName__"], "Remember", remember_value)
+    }
+
+    log.verb("Notify was 'Ask': {1} action", remember_value)
+    return answer
+}
+
 ; perform an update check only without any user interaction
 ; displays a message box if an update is present, exits quietly otherwise
 QuietUpdateCheck() {
@@ -198,36 +223,49 @@ RunNewPackage() {
     Run %new_updater% "%old_updater%"
 }
 
+; start the package process, pulled from the config
+RunPackageProcess() {
+    global
+
+    local package_process := OLD_PACKAGE.path(OLD_PACKAGE.package("Process"))
+    log.info("Executing new package process: '{1} '{2}''", package_process)
+    Run %package_process%
+}
+
 ; used in phase 2 of an update "NEW_PACKAGE"
 ; performs the update and transfers important files to "OLD_PACKAGE"
 UpdatePackage() {
     global
 
-    MsgBox, Package Updater, This is Phase #2
-    ExitApp
-}
-
-; phase 2
-; transfer the latest package to the old location
-SetLatestPackage(old_updater, new_updater) {
-    global SELF, APP_DIRECTORY, TEMP_DIRECTORY, log
-
-    old_package := new Package(old_updater)
-    new_package := new Package(new_updater)
-
-    log.info("Preparing to transfer package from '{1}' to '{2}'", new_package.base_directory, old_package.base_directory)
-    transfer := new Transfer(new_package.base_directory, old_package.base_directory)
+    log.info("Preparing to transfer package from '{1}' to '{2}'", NEW_PACKAGE.base_directory, OLD_PACKAGE.base_directory)
+    transfer := new Transfer(NEW_PACKAGE.base_directory, OLD_PACKAGE.base_directory, Func("NotifyCallback"))
 
     if transfer {
-        complex_paths := new_package.GetComplexPaths()
+        local complex_paths := new_package.GetComplexPaths()
         transfer.BasicFiles(complex_paths)
 
         for complex, action in new_package.GetComplexKeys() {
-            complex_data := new_package.main_data[complex]
-            result := transfer.ComplexFile(complex_data, action)
-            log.info("Performed '{1}' on '{2}' (result: {3})", action, complex_data["Path"], result)
+            ; get the complex data, inject the section name into the object
+            local complex_data := new_package.main_data[complex]
+            complex_data["__SectionName__"] := complex
+
+            local result := transfer.ComplexFile(complex_data, action)
+            if (result) {
+                log.info("Performed '{1}' on '{2}'", action, complex_data["Path"])
+            } else {
+                log.info("Did not perform '{1}' on '{2}'", action, complex_data["Path"])
+
+            }
         }
+
+        local auto_start := OLD_PACKAGE.updater("AutoStart", 0)
+        if (auto_start) {
+            RunPackageProcess()
+        }
+    } else {
+        log.crit("There was an issue creating the transfer object, transfer failed")
     }
+    ExitApp
 }
 
 ; entry point
@@ -243,6 +281,8 @@ for index, dir in [APP_DIRECTORY, TEMP_DIRECTORY] {
         log.verb("Created working temp directory '{1}' (error: {2})", dir, A_LastError)
     }
 }
+
+log.info("Processing arguments: {1} {2} {3}", A_ScriptFullPath, A_Args[1], A_Args[2])
 
 ; handle arguments
 switch A_Args[1] {
@@ -269,8 +309,15 @@ switch A_Args[1] {
 		if FileExist(A_Args[1]) {
 			; execute phase 2 of the update process
 			log.info("Executing phase 2 of the update process")
-			global NEW_PACKAGE := new Package(A_ScriptFullPath)
 			global OLD_PACKAGE := new Package(A_Args[1])
+
+            ; load OLD_PACKAGE user config into NEW_PACKAGE
+            ; we have to transfer both user_config_path and user_ini
+			global NEW_PACKAGE := new Package(A_ScriptFullPath)
+            NEW_PACKAGE.user_config_path := OLD_PACKAGE.user_config_path
+            NEW_PACKAGE.user_ini := OLD_PACKAGE.user_ini
+            NEW_PACKAGE.ReloadConfigFromDisk(1)
+
 			UpdatePackage()
 		} else {
 			; standard update process, launch update dialog first

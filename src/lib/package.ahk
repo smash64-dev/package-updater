@@ -22,9 +22,10 @@ class Package {
         plog := new Logger("package.ahk")
         this.log := plog
 
-        this.updater_binary := updater_binary
-        SplitPath, updater_binary,, binary_path
-        this.main_config_path := main_config != "" ? main_config : Format("{1}\updater.cfg", binary_path)
+        ; splitpath doesn't like forward slashes in paths
+        this.updater_binary := StrReplace(updater_binary, "/", "\")
+        SplitPath, % this.updater_binary,, binary_path
+        this.main_config_path := main_config ? main_config : Format("{1}\updater.cfg", binary_path)
 
         this.main_ini := new IniConfig(this.main_config_path)
         this.ReloadConfigFromDisk(1)
@@ -123,7 +124,11 @@ class Package {
         this.base_directory := this.__GetBaseDirectory(this.updater_binary, package_binary)
 
         ; we've already created a user object, just reload it
-        if (this.user_config_path and ! this.user_ini.Count()) {
+        if (this.user_config_path) {
+            if (! this.user_ini.Count()) {
+                this.user_ini := new IniConfig(this.user_config_path)
+            }
+
             this.user_ini.ReadConfig(update_original)
             this.main_ini.InsertConfig(this.user_ini)
 

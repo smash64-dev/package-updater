@@ -8,10 +8,11 @@
 class Transfer {
     static log := {}
 
+    notify_callback := 0
     src_dir := ""
     dest_dir := ""
 
-    __New(src_dir, dest_dir) {
+    __New(src_dir, dest_dir, notify_callback := 0) {
         tlog := new Logger("transfer.ahk")
         this.log := tlog
 
@@ -28,6 +29,11 @@ class Transfer {
         if ! InStr(FileExist(this.dest_dir), "D") {
             this.log.warn("Unable to find destination directory '{1}', creating", dest_dir)
             FileCreateDir % dest_dir
+        }
+
+        if IsFunc(notify_callback) {
+            this.log.info("Registering '{1}' as the notify callback", notify_callback.Name)
+            this.notify_callback := notify_callback
         }
     }
 
@@ -94,6 +100,7 @@ class Transfer {
             case "Duplicate":   return this.__DoDuplicate(complex_data)
             case "Latest":      return this.__DoLatest(complex_data)
             case "Link":        return this.__DoLatest(complex_data, "L")
+            case "Noop":        return true
             case "Present":     return this.__DoPresent(complex_data)
             case "Rename":      return this.__DoRename(complex_data)
 
@@ -111,27 +118,58 @@ class Transfer {
 
         ; some complex files cannot be ignored
         if ignorable {
+            ; if it's ignorable, see if the user stored a preference
             switch remember
             {
-                case "Allow":   return true
-                case "Deny":    return false
-                case "None":    this.log.verb("No user preference saved for '{1}', continuing to notify", complex_data["Name"])
+                case "Allow":
+                    this.log.info("User preference saved as '{1}' for '{2}'", remember, complex_data["Name"])
+                    return true
+
+                case "Deny":
+                    this.log.info("User preference saved as '{1}' for '{2}'", remember, complex_data["Name"])
+                    return false
+
+                case "None":
+                    this.log.verb("No user preference saved for '{1}', continuing to notify", complex_data["Name"])
 
                 default:
-                    this.log.err("Unknown remember directive '{1}'", remember)
-                    return false
+                    this.log.warn("Unknown remember directive '{1}', continuing to notify", remember)
+                    complex_data["Remember"] = "None"
+            }
+        } else {
+            if (remember != "None") {
+                this.log.warn("User tried to '{1}' action '{2}', but it is not ignorable", remember, complex_data["Name"])
             }
         }
 
+        ; notify the user in some way
         switch notify
         {
-            case "Ask":     return true
-            case "Tell":    return true
-            case "None":    return true
+            case "Ask":
+                this.log.verb("Valid notify directive '{1}', requesting action for '{2}'", notify, complex_data["Name"])
+
+            case "Tell":
+                this.log.verb("Valid notify directive '{1}', requesting action for '{2}'", notify, complex_data["Name"])
+
+            case "None":
+                this.log.info("No notify required, allowing action '{1}'", complex_data["Name"])
+                return true
 
             default:
-                this.log.err("Unknown notify directive '{1}'", notify)
-                return false
+                this.log.warn("Unknown notify directive '{1}', allowing action '{2}'", notify, complex_data["Name"])
+                return true
+        }
+
+        ; execute the callback
+        if IsFunc(this.notify_callback) {
+            response := this.notify_callback.Call(complex_data)
+            allowing := response ? "allowing" : "not allowing"
+
+            this.log.info("Notified user with '{1}', {2} action '{3}'", notify, allowing, complex_data["Name"])
+            return response
+        } else {
+            this.log.warn("No callback function registered, allowing action '{1}'", complex_data["Name"])
+            return true
         }
     }
 
@@ -150,8 +188,12 @@ class Transfer {
             return false
 
         if FileExist(this.dest(complex_data["Path"])) {
-            recurse := complex_data.HasKey("Recurse") ? complex_data["Recurse"] : 0
-            return this.__TransferDelete(complex_data["Path"], recurse)
+            if this.__AllowAction(complex_data) {
+                recurse := complex_data.HasKey("Recurse") ? complex_data["Recurse"] : 0
+                return this.__TransferDelete(complex_data["Path"], recurse)
+            } else {
+                return false
+            }
         } else {
             this.log.verb("Complex file '{1}' already removed from destination", complex_data["Path"])
             return true
@@ -164,8 +206,12 @@ class Transfer {
             return false
 
         if FileExist(this.dest(complex_data["Path"])) {
-            overwrite := complex_data.HasKey("Overwrite") ? complex_data["Overwrite"] : 0
-            return this.__TransferRelative(complex_data["Path"], complex_data["Target"], 1, overwrite)
+            if this.__AllowAction(complex_data) {
+                overwrite := complex_data.HasKey("Overwrite") ? complex_data["Overwrite"] : 0
+                return this.__TransferRelative(complex_data["Path"], complex_data["Target"], 1, overwrite)
+            } else {
+                return false
+            }
         } else {
             this.log.warn("Complex path '{1}' does not exist in destination", complex_data["Path"])
             return false
@@ -177,10 +223,24 @@ class Transfer {
         if ! this.__VerifyStruct(complex_data, ["Path", "Content", "Type"])
             return false
 
+
         ; work off the destination ini, this means the ini should be at least
         ; transferred as present, if there's a concern about it not being in destination
+        ; if Local is set, then the content comes from the old package (likely user made)
+        local_content := complex_data["Local"] ? complex_data["Local"] : 0
         path := this.dest(complex_data["Path"])
-        content := this.src(complex_data["Content"])
+
+        if (local_content) {
+            content := this.dest(complex_data["Content"])
+
+            if (! FileExist(content)) {
+                log.warn("Local content '{1}' does not exist in destination", content)
+                return false
+            }
+        } else {
+            content := this.src(complex_data["Content"])
+        }
+
         format := complex_data.HasKey("Format") ? complex_data["Format"] : 1
 
         ; the full path is only needed for the IniConfig class
@@ -200,7 +260,11 @@ class Transfer {
 
         ; use the partial path again within class
         if ! this.__HasLatestContent(complex_data["Path"], ini_config) {
-            return this.__TransferIniConfig(complex_data["Path"], ini_config, format)
+            if this.__AllowAction(complex_data) {
+                return this.__TransferIniConfig(complex_data["Path"], ini_config, format)
+            } else {
+                return false
+            }
         } else {
             this.log.verb("Ini Config '{1}' already matches the content (format: {2})", complex_data["Path"], format)
 
@@ -214,29 +278,47 @@ class Transfer {
     __DoLatest(complex_data, path_type := 0) {
         switch path_type {
             case "D":
-                if this.__VerifyStruct(complex_data, ["Path"])
-                    return this.__TransferDir(complex_data["Path"])
-                else
+                if this.__VerifyStruct(complex_data, ["Path"]) {
+                    if this.__AllowAction(complex_data) {
+                        return this.__TransferDir(complex_data["Path"])
+                    } else {
+                        return false
+                    }
+                } else {
                     return false
+                }
 
             case "L":
-                if this.__VerifyStruct(complex_data, ["Path", "Target"])
-                    return this.__TransferLink(complex_data)
-                else
+                if this.__VerifyStruct(complex_data, ["Path", "Target"]) {
+                    if this.__AllowAction(complex_data) {
+                        return this.__TransferLink(complex_data)
+                    } else {
+                        return false
+                    }
+                } else {
                     return false
+                }
 
             default:
                 if this.__VerifyStruct(complex_data, ["Path"]) {
                     if (complex_data.HasKey("Checksum")) {
                         if (! this.__HasLatestChecksum(complex_data["Path"], complex_data["Checksum"])) {
-                            return this.__TransferFile(complex_data["Path"])
+                            if this.__AllowAction(complex_data) {
+                                return this.__TransferFile(complex_data["Path"])
+                            } else {
+                                return false
+                            }
                         } else {
                             this.log.verb("File '{1}' already matches the content (format: {2})", complex_data["Path"])
                             return true
                         }
                     } else {
                         ; there are no restrictions, just transfer
-                        return this.__TransferFile(complex_data["Path"])
+                        if this.__AllowAction(complex_data) {
+                            return this.__TransferFile(complex_data["Path"])
+                        } else {
+                            return false
+                        }
                     }
                 } else {
                     return false
@@ -262,7 +344,8 @@ class Transfer {
             return false
 
         if ! FileExist(this.dest(complex_data["Path"])) {
-            this.__DoLatest(complex_data, path_type)
+            ; __AllowAction not needed, it's handled by __DoLatest
+            return this.__DoLatest(complex_data, path_type)
         } else {
             this.log.verb("Complex path '{1}' already exists in destination", complex_data["Path"])
         }
@@ -276,8 +359,12 @@ class Transfer {
             return false
 
         if FileExist(this.dest(complex_data["Path"])) {
-            overwrite := complex_data.HasKey("Overwrite") ? complex_data["Overwrite"] : 0
-            return this.__TransferRelative(complex_data["Path"], complex_data["Target"], 0, overwrite)
+            if this.__AllowAction(complex_data) {
+                overwrite := complex_data.HasKey("Overwrite") ? complex_data["Overwrite"] : 0
+                return this.__TransferRelative(complex_data["Path"], complex_data["Target"], 0, overwrite)
+            } else {
+                return false
+            }
         } else {
             this.log.warn("Complex path '{1}' does not exist in destination", complex_data["Path"])
             return false
@@ -475,10 +562,13 @@ class Transfer {
         if ! this.__VerifyKey(complex_data, "Ignorable", [0, 1])
             return false
 
-        if ! this.__VerifyKey(complex_data, "Overwrite", [0, 1])
+        if ! this.__VerifyKey(complex_data, "Local", [0, 1])
             return false
 
         if ! this.__VerifyKey(complex_data, "Notify", ["Ask", "None", "Tell"])
+            return false
+
+        if ! this.__VerifyKey(complex_data, "Overwrite", [0, 1])
             return false
 
         if ! this.__VerifyKey(complex_data, "Remember", ["Allow", "Deny", "None"])
