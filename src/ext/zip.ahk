@@ -18,6 +18,25 @@ http://www.autohotkey.com/forum/viewtopic.php?t=65401
 
 Zip(sDir, sZip)
 {
+    in_wine := DllCall("GetProcAddress", "Ptr", DllCall("GetModuleHandle", "Str", "ntdll", "Ptr"), "AStr", "wine_get_version", "Ptr")
+    7zip_local := "7za.exe"
+    7zip_install := "C:\Program Files (x86)\7-Zip\7z.exe"
+
+    if in_wine {
+        if FileExist(7zip_local) {
+            RunWait, "%7zip_local%" a "%sZip%" -t"zip" "%sDir%" -r -y,,hide
+            return
+        }
+
+        if FileExist(7zip_install) {
+            RunWait, "%7zip_install%" a "%sZip%" -t"zip" "%sDir%" -r -y,,hide
+            return
+        }
+
+        MsgBox 0x10, Unable to find 7-Zip, Please install 7-Zip (32-bit) within Wine
+        return
+    }
+
    If Not FileExist(sZip)
    {
     Header1 := "PK" . Chr(5) . Chr(6)
@@ -40,6 +59,25 @@ Zip(sDir, sZip)
 
 Unz(sZip, sUnz)
 {
+    in_wine := DllCall("GetProcAddress", "Ptr", DllCall("GetModuleHandle", "Str", "ntdll", "Ptr"), "AStr", "wine_get_version", "Ptr")
+    7zip_local := "7za.exe"
+    7zip_install := "C:\Program Files (x86)\7-Zip\7z.exe"
+
+    if in_wine {
+        if FileExist(7zip_local) {
+            RunWait, "%7zip_local%" x "%sZip%" -o"%sUnz%" -y,,hide
+            return
+        }
+
+        if FileExist(7zip_install) {
+            RunWait, "%7zip_install%" x "%sZip%" -o"%sUnz%" -y,,hide
+            return
+        }
+
+        MsgBox 0x10, Unable to find 7-Zip, Please install 7-Zip (32-bit) within Wine
+        return
+    }
+
     fso := ComObjCreate("Scripting.FileSystemObject")
     If Not fso.FolderExists(sUnz)  ;http://www.autohotkey.com/forum/viewtopic.php?p=402574
        fso.CreateFolder(sUnz)

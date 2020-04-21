@@ -41,7 +41,8 @@ class Asset {
 
         if this.__ValidateAsset(asset_path, checksum_path, this.checksum_type) {
             if InStr(this.asset_name, ".zip")
-                return this.__ExtractZipAsset(asset_path, Format("{1}\latest", directory))
+                SplitPath, asset_path,,, asset_ext, asset_name
+                return this.__ExtractZipAsset(asset_path, Format("{1}\{2}-latest", directory, asset_name))
             else
                 return asset_path
         } else {
