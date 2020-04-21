@@ -1,12 +1,14 @@
 ; updater.ahk
 
+#NoTrayIcon
 #SingleInstance force
+
 #Include %A_LineFile%\..\include.ahk
 
 global AUTHOR := "CEnnis91 © 2020"
 global SELF := "package-updater"
 global SOURCE := "https://github.com/smash64-dev/package-updater"
-global VERSION := "0.9.0"
+global VERSION := "0.9.2"
 
 global APP_DIRECTORY := Format("{1}\{2}", A_AppData, SELF)
 global TEMP_DIRECTORY := Format("{1}\{2}", A_Temp, SELF)
@@ -133,7 +135,7 @@ IsCurrentLatest(latest_version) {
     local new_version := CleanVersionString(latest_version)
 
     if (! old_id or ! new_id) {
-        log.warn("Unable to determine build IDs, reverting to version checks")
+        log.warn("Unable to determine build IDs, reverting to version checks '{1}' vs '{2}'", old_id, new_id)
         old_id := old_version
         new_id := new_version
     }
