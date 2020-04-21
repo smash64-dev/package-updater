@@ -7,7 +7,11 @@ SELF_DIR="$(dirname "$(readlink -f "$0")")"
 BASE_DIR="$(dirname "$SELF_DIR")"
 BUILD_DIR="${BASE_DIR}/build"
 
-"${BASE_DIR}/build.bat"
+# support building on multiple platforms
+case $(uname -s) in
+    [Ll]inux)   wine cmd.exe /c "${BASE_DIR}/build.bat" ;;
+    *)          "${BASE_DIR}/build.bat" ;;
+esac
 
 echo ""
 echo "- Running git archive"
