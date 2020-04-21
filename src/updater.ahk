@@ -275,9 +275,9 @@ UpdatePackage() {
 
 ; entry point
 global log := new Logger("updater.ahk")
-log.info("===================================")
-log.info("= {1} (v{2})", SELF, VERSION)
-log.info("===================================")
+log.crit("===================================")
+log.crit("= {1} (v{2})", SELF, VERSION)
+log.crit("===================================")
 
 ; create base working directories if they don't exist
 for index, dir in [APP_DIRECTORY, TEMP_DIRECTORY] {

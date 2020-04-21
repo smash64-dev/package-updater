@@ -40,11 +40,12 @@ class Asset {
             checksum_path := this.__DownloadFile(directory, this.checksum_url)
 
         if this.__ValidateAsset(asset_path, checksum_path, this.checksum_type) {
-            if InStr(this.asset_name, ".zip")
+            if (InStr(this.asset_name, ".zip")) {
                 SplitPath, asset_path,,, asset_ext, asset_name
                 return this.__ExtractZipAsset(asset_path, Format("{1}\{2}-latest", directory, asset_name))
-            else
+            } else {
                 return asset_path
+            }
         } else {
             return false
         }
