@@ -110,6 +110,12 @@ class Package {
             }
         }
 
+        ; don't copy the override config
+        override_config := this.__GetSectionValue("User", "Override", false)
+        if (override_config) {
+            complex_hash[override_config] = "User_Override"
+        }
+
         return complex_hash
     }
 

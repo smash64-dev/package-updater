@@ -6,7 +6,7 @@
 global AUTHOR := "CEnnis91 © 2020"
 global SELF := "package-updater"
 global SOURCE := "https://github.com/smash64-dev/package-updater"
-global VERSION := "1.0.0"
+global VERSION := "0.9.0"
 
 global APP_DIRECTORY := Format("{1}\{2}", A_AppData, SELF)
 global TEMP_DIRECTORY := Format("{1}\{2}", A_Temp, SELF)
@@ -161,7 +161,7 @@ NonInteractiveUpdate() {
         KillPackageProcess()
         RunNewPackage()
     } else {
-        MsgBox, Package Updater, Unable to update package
+        log.crit("There was an issue running the update non-interactively")
         ExitApp
     }
 }
@@ -227,9 +227,15 @@ RunNewPackage() {
 RunPackageProcess() {
     global
 
-    local package_process := OLD_PACKAGE.path(OLD_PACKAGE.package("Process"))
-    log.info("Executing new package process: '{1} '{2}''", package_process)
-    Run %package_process%
+    local auto_start := OLD_PACKAGE.updater("AutoStart", 0)
+
+    if (auto_start) {
+        local package_process := OLD_PACKAGE.path(OLD_PACKAGE.package("Process"))
+        log.info("Executing new package process: '{1}'", package_process)
+        Run %package_process%
+    } else {
+        log.info("Not executing new package: '{1}', autostart disabled")
+    }
 }
 
 ; used in phase 2 of an update "NEW_PACKAGE"
@@ -254,14 +260,11 @@ UpdatePackage() {
                 log.info("Performed '{1}' on '{2}'", action, complex_data["Path"])
             } else {
                 log.info("Did not perform '{1}' on '{2}'", action, complex_data["Path"])
-
             }
         }
 
-        local auto_start := OLD_PACKAGE.updater("AutoStart", 0)
-        if (auto_start) {
-            RunPackageProcess()
-        }
+        ; runs the package process if autostart is enabled
+        RunPackageProcess()
     } else {
         log.crit("There was an issue creating the transfer object, transfer failed")
     }
@@ -286,6 +289,11 @@ log.info("Processing arguments: {1} {2} {3}", A_ScriptFullPath, A_Args[1], A_Arg
 
 ; handle arguments
 switch A_Args[1] {
+    ; display help information
+    case "-h":
+        log.info("Displaying help information")
+        Help_Dialog(1)
+
     ; run an update without displaying the main dialog
     ; message boxes will still appear in phase 2 of the update
     case "-n":

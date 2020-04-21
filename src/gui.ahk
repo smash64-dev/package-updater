@@ -229,6 +229,28 @@ Check_For_Updates() {
     return true
 }
 
+Help_Dialog(help_only := 0) {
+    global
+
+    local title := "Help"
+    local version_text := Format("{1} — v{2}", SELF ? SELF : "package-updater", VERSION ? VERSION : "0.0.0")
+    local cmdline_text := Format("{1} [-h] [-n] [-q] [-v]", A_ScriptName)
+
+    local cmd_help := Format("    -h: Displays this help dialog")
+    local cmd_noni := Format("    -n: Runs a non-interactive update")
+    local cmd_quiet := Format("    -q: Quietly checks for updates")
+    local cmd_version := Format("    -v: Displays an about dialog")
+    local cmd_default := Format("Running {1} without arguments will run a normal update process with a dialog and interactive options.", A_ScriptName)
+
+    local cmdline_description := Format("{1}`n{2}`n{3}`n{4}`n`n{5}", cmd_help, cmd_noni, cmd_quiet, cmd_version, cmd_default)
+    MsgBox, % (0x40 | 0x2000), % title, % Format("{1}`n{2}`n`n{3}", version_text, cmdline_text, cmdline_description)
+
+    if help_only
+        ExitApp
+    else
+        return
+}
+
 Main_Dialog() {
     global
 
@@ -327,10 +349,18 @@ Run_Update(rerun := 0) {
 
     if rerun {
         local ask_title := "Are you sure?"
-        local ask_text := "FIXME: Running this will update your emulator, but keep your ROMs, and reapply any settings etc etc"
+        local base_text := "Do you want to reapply the latest update?"
+        local custom_text := OLD_PACKAGE.gui("RerunText", false)
     } else {
         local ask_title := "Are you sure?"
-        local ask_text := "FIXME: Running this will update your emulator, but keep your ROMs etc etc"
+        local base_text := "Do you want to update to the latest version?"
+        local custom_text := OLD_PACKAGE.gui("UpdateText", false)
+    }
+
+    if (custom_text) {
+        ask_text := Format("{1}`n`n{2}", custom_text, base_text)
+    } else {
+        ask_text := Format("{1}", base_text)
     }
 
     MsgBox, % (0x4 | 0x30 | 0x100 | 0x2000), % ask_title, % ask_text
@@ -347,7 +377,14 @@ Update_Available_Dialog(latest_version) {
     global
 
     local update_title := Format("{1} — v{2}", SELF ? SELF : "package-updater", VERSION ? VERSION : "0.0.0")
-    local update_text := Format("FIXME: A new version is available, want to download it?")
+    local base_text := "A new version is available, do you want to update to it?"
+    local custom_text := OLD_PACKAGE.gui("UpdateAvailable", false)
+
+    if (custom_text) {
+        update_text := custom_text
+    } else {
+        update_text := base_text
+    }
 
     MsgBox, % (0x4 | 0x30 | 0x100 | 0x2000), % update_title, % update_text
     IfMsgBox, Yes

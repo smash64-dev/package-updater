@@ -140,7 +140,7 @@ TestPackage() {
     package := new Package(A_LineFile, Format("{1}\..\..\conf\tests.cfg", A_LineFile))
 
     assert("Package name", package.Package("Name") != "package-updater-tests")
-    assert("Invalid key default value", package.updater("Invalid", "default") != "default")
+    assert("__Invalid__ key default value", package.updater("__Invalid__", "default") != "default")
     assert("Path to 'README.md'", package.path("README.md") == "")
     assert("Path to invalid directory", package.path("invalid\dir\path") != 0)
 
@@ -158,8 +158,6 @@ TestPackage() {
     IniDelete, % package.main_config_path, % "brandnewsection"
     package.ReloadConfigFromDisk()
     assert("Remove new key from config", package.main_ini.HasSection("brandnewsection"))
-
-    assert("Backup()", "TODO")
 
     return true
 }

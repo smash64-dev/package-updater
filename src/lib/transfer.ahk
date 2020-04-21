@@ -68,9 +68,16 @@ class Transfer {
         }
     }
 
-    ; TODO: backup file
-    BackupFile() {
+    ; backup an individual file in place
+    BackupFile(complex_data) {
+        backup := complex_data["Backup"] ? complex_data["Backup"] : 0
 
+        if (backup) {
+            backup_path := Format("{1}.bak", complex_data["Path"])
+
+            this.log.info("Performing a backup on '{1}' ({2}", complex_data["Path"], backup_path)
+            this.__TransferRelative(complex_data["Path"], backup_path, 1, 1)
+        }
     }
 
     ; handle managed file or directory based on specification
@@ -190,6 +197,7 @@ class Transfer {
         if FileExist(this.dest(complex_data["Path"])) {
             if this.__AllowAction(complex_data) {
                 recurse := complex_data.HasKey("Recurse") ? complex_data["Recurse"] : 0
+                this.BackupFile(complex_data)
                 return this.__TransferDelete(complex_data["Path"], recurse)
             } else {
                 return false
@@ -222,7 +230,6 @@ class Transfer {
     __DoIniConfig(complex_data, action) {
         if ! this.__VerifyStruct(complex_data, ["Path", "Content", "Type"])
             return false
-
 
         ; work off the destination ini, this means the ini should be at least
         ; transferred as present, if there's a concern about it not being in destination
@@ -261,6 +268,7 @@ class Transfer {
         ; use the partial path again within class
         if ! this.__HasLatestContent(complex_data["Path"], ini_config) {
             if this.__AllowAction(complex_data) {
+                this.BackupFile(complex_data)
                 return this.__TransferIniConfig(complex_data["Path"], ini_config, format)
             } else {
                 return false
@@ -304,6 +312,7 @@ class Transfer {
                     if (complex_data.HasKey("Checksum")) {
                         if (! this.__HasLatestChecksum(complex_data["Path"], complex_data["Checksum"])) {
                             if this.__AllowAction(complex_data) {
+                                this.BackupFile(complex_data)
                                 return this.__TransferFile(complex_data["Path"])
                             } else {
                                 return false
@@ -315,6 +324,7 @@ class Transfer {
                     } else {
                         ; there are no restrictions, just transfer
                         if this.__AllowAction(complex_data) {
+                            this.BackupFile(complex_data)
                             return this.__TransferFile(complex_data["Path"])
                         } else {
                             return false
@@ -323,18 +333,6 @@ class Transfer {
                 } else {
                     return false
                 }
-        }
-    }
-
-    __DoNotify(complex_data) {
-        switch complex_data["Notify"] {
-            case "Ask":     return true
-            case "None":    return true
-            case "Tell":    return true
-
-            default:
-                this.log.err("Unknown notify directive '{1}'", complex_data["Notify"])
-                return false
         }
     }
 
@@ -559,6 +557,9 @@ class Transfer {
         }
 
         ; ensure that any optional values present have valid values
+        if ! this.__VerifyKey(complex_data, "Backup", [0, 1])
+            return false
+
         if ! this.__VerifyKey(complex_data, "Ignorable", [0, 1])
             return false
 
