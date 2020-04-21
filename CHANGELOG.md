@@ -4,11 +4,15 @@
 
 ### Added
 
-- wine support for zip / unzip (requires 7-Zip installed)
+- wine support for zip / unzip (requires 7-Zip)
 
 ### Changed
 
 - make asset extract directory more unique
+
+### Fixed
+
+- user override config not being protected during transfer
 
 ## [0.9.2] - 2020-04-21
 
