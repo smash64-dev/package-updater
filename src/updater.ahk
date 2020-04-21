@@ -234,7 +234,12 @@ RunPackageProcess() {
     if (auto_start) {
         local package_process := OLD_PACKAGE.path(OLD_PACKAGE.package("Process"))
         log.info("Executing new package process: '{1}'", package_process)
-        Run %package_process%
+
+        if FileExist(package_process) {
+            Run %package_process%
+        } else {
+            log.err("Package process '{1}' does not exist, not running", package_process)
+        }
     } else {
         log.info("Not executing new package: '{1}', autostart disabled")
     }
