@@ -370,7 +370,7 @@ Run_Update(rerun := 0) {
     BackupOldPackage()
     KillPackageProcess()
     RunNewPackage()
-    return true
+    ExitApp
 }
 
 Update_Available_Dialog(latest_version) {

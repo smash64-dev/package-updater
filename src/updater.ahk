@@ -132,7 +132,7 @@ IsCurrentLatest(latest_version) {
     local new_id := NEW_PACKAGE.package("BuildId", false)
     local new_version := CleanVersionString(latest_version)
 
-    if (! old_build_id or ! new_build_id) {
+    if (! old_id or ! new_id) {
         log.warn("Unable to determine build IDs, reverting to version checks")
         old_id := old_version
         new_id := new_version
@@ -272,7 +272,7 @@ UpdatePackage() {
 }
 
 ; entry point
-global log := new Logger("updater.ahk", "V")
+global log := new Logger("updater.ahk")
 log.info("===================================")
 log.info("= {1} (v{2})", SELF, VERSION)
 log.info("===================================")

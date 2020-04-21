@@ -4,7 +4,7 @@
 #Include %A_LineFile%\..\include.ahk
 
 global SELF := "package-updater-tests"
-global VERSION := "1.0.0"
+global VERSION := "0.0.0"
 
 global APP_DIRECTORY := Format("{1}\{2}", A_AppData, SELF)
 global TEMP_DIRECTORY := Format("{1}\{2}", A_Temp, SELF)
