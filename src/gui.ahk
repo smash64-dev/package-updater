@@ -17,7 +17,7 @@ About_Dialog(about_only := 0) {
         return
 }
 
-Beta_Checkbox() {
+Beta_Checkbox(enable_when_valid := 1) {
     global
 
     local beta_message := ""
@@ -36,7 +36,11 @@ Beta_Checkbox() {
         beta_configurable := " (not user configurable)"
         GuiControl, Disable, Beta
     } else {
-        GuiControl, Enable, Beta
+        if (enable_when_valid) {
+            GuiControl, Enable, Beta
+        } else {
+            GuiControl, Disable, Beta
+        }
     }
 
     local updater_beta := OLD_PACKAGE.updater("Beta", "0")
@@ -234,15 +238,16 @@ Help_Dialog(help_only := 0) {
 
     local title := "Help"
     local version_text := Format("{1} — v{2}", SELF ? SELF : "package-updater", VERSION ? VERSION : "0.0.0")
-    local cmdline_text := Format("{1} [-h] [-n] [-q] [-v]", A_ScriptName)
+    local cmdline_text := Format("{1} [-h] [-n] [-q] [-s] [-v]", A_ScriptName)
 
     local cmd_help := Format("    -h: Displays this help dialog")
     local cmd_noni := Format("    -n: Runs a non-interactive update")
     local cmd_quiet := Format("    -q: Quietly checks for updates")
+    local cmd_self := Format("    -s: Updates self non-interactively")
     local cmd_version := Format("    -v: Displays an about dialog")
     local cmd_default := Format("Running {1} without arguments will run a normal update process with a dialog and interactive options.", A_ScriptName)
 
-    local cmdline_description := Format("{1}`n{2}`n{3}`n{4}`n`n{5}", cmd_help, cmd_noni, cmd_quiet, cmd_version, cmd_default)
+    local cmdline_description := Format("{1}`n{2}`n{3}`n{4}`n{5}`n`n{6}", cmd_help, cmd_noni, cmd_quiet, cmd_self, cmd_version, cmd_default)
     MsgBox, % (0x40 | 0x2000), % title, % Format("{1}`n{2}`n`n{3}", version_text, cmdline_text, cmdline_description)
 
     if help_only
@@ -305,7 +310,7 @@ Main_Dialog() {
     GuiControl, Hide, Update
 
     ; build and set the beta checkbox
-    Beta_Checkbox()
+    Beta_Checkbox(0)
 
     ; display gui and immediately check for updates
     Gui, Main:Show, Center h402 w579, % title
@@ -326,7 +331,9 @@ Main_Dialog() {
 
     ; check for updates
     MainButtonCheckForUpdates:
+        Beta_Checkbox(0)
         Check_For_Updates()
+        Beta_Checkbox(1)
         return
 
     ; reapply the update from this version

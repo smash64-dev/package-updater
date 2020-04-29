@@ -8,7 +8,7 @@
 global AUTHOR := "CEnnis91 © 2020"
 global SELF := "package-updater"
 global SOURCE := "https://github.com/smash64-dev/package-updater"
-global VERSION := "0.9.3"
+global VERSION := "0.9.4"
 
 global APP_DIRECTORY := Format("{1}\{2}", A_AppData, SELF)
 global TEMP_DIRECTORY := Format("{1}\{2}", A_Temp, SELF)
@@ -232,7 +232,7 @@ RunPackageProcess() {
     local auto_start := OLD_PACKAGE.updater("AutoStart", 0)
 
     if (auto_start) {
-        local package_process := OLD_PACKAGE.path(OLD_PACKAGE.package("Process"))
+        local package_process := OLD_PACKAGE.path(NEW_PACKAGE.package("Process"))
         log.info("Executing new package process: '{1}'", package_process)
 
         if FileExist(package_process) {
@@ -247,11 +247,16 @@ RunPackageProcess() {
 
 ; used in phase 2 of an update "NEW_PACKAGE"
 ; performs the update and transfers important files to "OLD_PACKAGE"
-UpdatePackage() {
+UpdatePackage(force := 0) {
     global
 
     log.info("Preparing to transfer package from '{1}' to '{2}'", NEW_PACKAGE.base_directory, OLD_PACKAGE.base_directory)
-    transfer := new Transfer(NEW_PACKAGE.base_directory, OLD_PACKAGE.base_directory, Func("NotifyCallback"))
+
+    if (force) {
+        transfer := new Transfer(NEW_PACKAGE.base_directory, OLD_PACKAGE.base_directory)
+    } else {
+        transfer := new Transfer(NEW_PACKAGE.base_directory, OLD_PACKAGE.base_directory, Func("NotifyCallback"))
+    }
 
     if transfer {
         local complex_paths := new_package.GetComplexPaths()
@@ -315,6 +320,12 @@ switch A_Args[1] {
         global OLD_PACKAGE := new Package(A_ScriptFullPath)
         QuietUpdateCheck()
 
+    case "-s":
+        log.info("Updating self package")
+        global OLD_PACKAGE := new Package(A_ScriptFullPath)
+        global NEW_PACKAGE := new Package(A_ScriptFullPath)
+        UpdatePackage(1)
+
     ; display version information
     case "-v":
         log.info("Displaying version information")
@@ -333,7 +344,7 @@ switch A_Args[1] {
             NEW_PACKAGE.user_ini := OLD_PACKAGE.user_ini
             NEW_PACKAGE.ReloadConfigFromDisk(1)
 
-			UpdatePackage()
+			UpdatePackage(0)
 		} else {
 			; standard update process, launch update dialog first
 			log.info("Executing phase 1 of the update process")

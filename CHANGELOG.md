@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.9.4] - 2020-04-28
+
+### Added
+
+- self mode which runs uninteractively
+
+### Fixed
+
+- autostart does not work when package Process changes
+- updater freezes when toggling beta flag mid-update check
+
 ## [0.9.3] - 2020-04-21
 
 ### Added
@@ -42,3 +53,4 @@
 [0.9.1]: https://github.com/smash64-dev/package-updater/releases/tag/v0.9.1
 [0.9.2]: https://github.com/smash64-dev/package-updater/releases/tag/v0.9.2
 [0.9.3]: https://github.com/smash64-dev/package-updater/releases/tag/v0.9.3
+[0.9.4]: https://github.com/smash64-dev/package-updater/releases/tag/v0.9.4
