@@ -324,33 +324,43 @@ log.info("Processing arguments: {1} {2} {3}", A_ScriptFullPath, A_Args[1], A_Arg
 
 ; handle arguments
 switch A_Args[1] {
+    ; check for updates quietly, and only notify the user if
+    ; there is a new update, this is ignorable via user config
+    case "-c", "--check-updates":
+        log.info("Quietly checking for updates")
+        global OLD_PACKAGE := new Package(A_ScriptFullPath)
+        QuietUpdateCheck()
+
     ; display help information
-    case "-h":
+    case "-h", "--help":
         log.info("Displaying help information")
         Help_Dialog(1)
 
     ; run an update without displaying the main dialog
     ; message boxes will still appear in phase 2 of the update
-    case "-n":
+    case "-n", "--non-interactive":
         log.info("Bypassing main dialog and running update")
         global OLD_PACKAGE := new Package(A_ScriptFullPath)
         NonInteractiveUpdate()
 
-    ; check for updates quietly, and only notify the user if
-    ; there is a new update, this is ignorable via user config
-    case "-q":
-        log.info("Quietly checking for updates")
-        global OLD_PACKAGE := new Package(A_ScriptFullPath)
-        QuietUpdateCheck()
-
-    case "-s":
+    ; run a self update, this applies the config to yourself
+    ; non-interactively, this is useful for development purposes
+    case "-s", "--self-quiet":
         log.info("Updating self package")
         global OLD_PACKAGE := new Package(A_ScriptFullPath)
         global NEW_PACKAGE := new Package(A_ScriptFullPath)
         UpdatePackage(1)
 
+    ; run a self update, this applies the config to yourself
+    ; interactively, this is useful for development purposes
+    case "--self-update":
+        log.info("Updating self package")
+        global OLD_PACKAGE := new Package(A_ScriptFullPath)
+        global NEW_PACKAGE := new Package(A_ScriptFullPath)
+        UpdatePackage(0)
+
     ; display version information
-    case "-v":
+    case "-v", "--version":
         log.info("Displaying version information")
         About_Dialog(1)
 

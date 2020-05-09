@@ -238,16 +238,16 @@ Help_Dialog(help_only := 0) {
 
     local title := "Help"
     local version_text := Format("{1} — v{2}", SELF ? SELF : "package-updater", VERSION ? VERSION : "0.0.0")
-    local cmdline_text := Format("{1} [-h] [-n] [-q] [-s] [-v]", A_ScriptName)
+    local cmdline_text := Format("{1} [-c] [-h] [-n] [-q] [-s] [-v]", A_ScriptName)
 
-    local cmd_help := Format("    -h: Displays this help dialog")
-    local cmd_noni := Format("    -n: Runs a non-interactive update")
-    local cmd_quiet := Format("    -q: Quietly checks for updates")
-    local cmd_self := Format("    -s: Updates self non-interactively")
-    local cmd_version := Format("    -v: Displays an about dialog")
+    local cmd_check := Format("    -c, --check-updates: Quietly checks for updates")
+    local cmd_help := Format("    -h, --help: Displays this help dialog")
+    local cmd_noni := Format("    -n, --non-interactive: Runs a non-interactive update")
+    local cmd_self := Format("    -s, --self-quiet: Updates self non-interactively`n    --self-update: Updates self interactively")
+    local cmd_version := Format("    -v, --version: Displays an about dialog")
     local cmd_default := Format("Running {1} without arguments will run a normal update process with a dialog and interactive options.", A_ScriptName)
 
-    local cmdline_description := Format("{1}`n{2}`n{3}`n{4}`n{5}`n`n{6}", cmd_help, cmd_noni, cmd_quiet, cmd_self, cmd_version, cmd_default)
+    local cmdline_description := Format("{1}`n{2}`n{3}`n{4}`n{5}`n`n{6}", cmd_check, cmd_help, cmd_noni, cmd_self, cmd_version, cmd_default)
     MsgBox, % (0x40 | 0x2000), % title, % Format("{1}`n{2}`n`n{3}", version_text, cmdline_text, cmdline_description)
 
     if help_only
@@ -357,11 +357,11 @@ Run_Update(rerun := 0) {
     if rerun {
         local ask_title := "Are you sure?"
         local base_text := "Do you want to reapply the latest update?"
-        local custom_text := OLD_PACKAGE.gui("RerunText", false)
+        local custom_text := NEW_PACKAGE.gui("RerunText", OLD_PACKAGE.gui("RerunText", false))
     } else {
         local ask_title := "Are you sure?"
         local base_text := "Do you want to update to the latest version?"
-        local custom_text := OLD_PACKAGE.gui("UpdateText", false)
+        local custom_text := NEW_PACKAGE.gui("UpdateText", OLD_PACKAGE.gui("UpdateText", false))
     }
 
     if (custom_text) {
@@ -382,13 +382,14 @@ Run_Update(rerun := 0) {
 
 Show_Update_Progress(percentage := 0) {
     global
+
     static update_message
     static update_message_time := 0
     static message_cycle := 3
 
     local window_title := Format("Updating {1}", NEW_PACKAGE.gui("Name", SELF ? SELF : "package-updater"))
     local default_messages := "Please wait;This will only take a few seconds"
-    local messages_string := NEW_PACKAGE.gui("UpdateMessages", default_messages)
+    local messages_string := NEW_PACKAGE.gui("UpdateMessages", OLD_PACKAGE.gui("UpdateMessages", default_messages))
     messages_string := messages_string ? messages_string : default_messages
 
     ; update the message every few seconds
@@ -431,8 +432,8 @@ Update_Available_Dialog(latest_version) {
     global
 
     local update_title := Format("{1} — v{2}", SELF ? SELF : "package-updater", VERSION ? VERSION : "0.0.0")
-    local base_text := "A new version is available, do you want to update to it?"
-    local custom_text := OLD_PACKAGE.gui("UpdateAvailable", false)
+    local base_text := Format("A new version is available ({1}), update now?", latest_version)
+    local custom_text := NEW_PACKAGE.gui("UpdateAvailable", OLD_PACKAGE.gui("UpdateAvailable", false))
 
     if (custom_text) {
         update_text := custom_text
