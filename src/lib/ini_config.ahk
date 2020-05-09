@@ -325,7 +325,6 @@ class IniConfig {
         if ! dry_run {
             this.__FormatIni()
         }
-
         return change_count
     }
 }

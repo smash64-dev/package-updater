@@ -380,6 +380,53 @@ Run_Update(rerun := 0) {
     ExitApp
 }
 
+Show_Update_Progress(percentage := 0) {
+    global
+    static update_message
+    static update_message_time := 0
+    static message_cycle := 3
+
+    local window_title := Format("Updating {1}", NEW_PACKAGE.gui("Name", SELF ? SELF : "package-updater"))
+    local default_messages := "Please wait;This will only take a few seconds"
+    local messages_string := NEW_PACKAGE.gui("UpdateMessages", default_messages)
+    messages_string := messages_string ? messages_string : default_messages
+
+    ; update the message every few seconds
+    FormatTime, now, , yyyyMMddHHmmss
+    if (now - update_message_time > message_cycle) {
+        update_message_time := now
+        local last_update_message := update_message
+        local messages_array := StrSplit(messages_string, ";")
+
+        ; make sure the message always changes
+        while (update_message == last_update_message) {
+            Random message_index, 1, messages_array.Length()
+            update_message := messages_array[message_index]
+        }
+    }
+    local window_message := Format("{1}...", update_message)
+
+    ; adjust percentage if we sent a fraction < 1
+    if (percentage > 0 and percentage <= 1) {
+        percentage := percentage * 100
+    }
+
+    ; yes, we artificially add delays to make the the progress bar look better
+    if (percentage == -1) {
+        Sleep 1000
+        Progress Off
+    } else if (percentage) {
+        Progress, % percentage, % window_message, % window_title
+        Sleep 250
+    } else {
+        ; the progress window is always on top
+        ; when we show it, we don't want it to interfere with the notify callback function
+        ; so just shove it in the top left corner of the user's screen
+        Progress, B X50 Y50, % window_message, % window_title
+    }
+
+}
+
 Update_Available_Dialog(latest_version) {
     global
 

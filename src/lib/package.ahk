@@ -94,18 +94,21 @@ class Package {
         for key, value in this.main_data {
             if RegExMatch(key, this.complex_regex) {
                 path := this.main_data[key]["Path"]
-                complex_hash[path] := key
+                path_fixed := StrReplace(path, "/", "\")
+                complex_hash[path_fixed] := key
 
                 ; add target paths to complex paths
                 if this.main_data[key].HasKey("Target") {
                     path := this.main_data[key]["Target"]
-                    complex_hash[path] := key
+                    path_fixed := StrReplace(path, "/", "\")
+                    complex_hash[path_fixed] := key
                 }
 
                 ; add content paths to complex paths (ini)
                 if this.main_data[key].HasKey("Content") {
                     path := this.main_data[key]["Content"]
-                    complex_hash[path] := key
+                    path_fixed := StrReplace(path, "/", "\")
+                    complex_hash[path_fixed] := key
                 }
             }
         }

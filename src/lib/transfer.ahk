@@ -103,7 +103,7 @@ class Transfer {
         {
             ; https://puppet.com/docs/puppet/latest/types/file.html#file-attribute-ensure
             case "Absent":      return this.__DoAbsent(complex_data)
-            case "Directory":   return this.__DoLatest(complex_data, "D")
+            case "Directory":   return this.__DoPresent(complex_data, "D")
             case "Duplicate":   return this.__DoDuplicate(complex_data)
             case "Latest":      return this.__DoLatest(complex_data)
             case "Link":        return this.__DoLatest(complex_data, "L")
@@ -214,11 +214,17 @@ class Transfer {
             return false
 
         if FileExist(this.dest(complex_data["Path"])) {
-            if this.__AllowAction(complex_data) {
-                overwrite := complex_data.HasKey("Overwrite") ? complex_data["Overwrite"] : 0
-                return this.__TransferRelative(complex_data["Path"], complex_data["Target"], 1, overwrite)
+            overwrite := complex_data.HasKey("Overwrite") ? complex_data["Overwrite"] : 0
+
+            if (overwrite or ! this.__HasLatestChecksum(complex_data["Target"], LC_FileSHA(complex_data["Path"]))) {
+                if this.__AllowAction(complex_data) {
+                    return this.__TransferRelative(complex_data["Path"], complex_data["Target"], 1, overwrite)
+                } else {
+                    return false
+                }
             } else {
-                return false
+                this.log.info("Complex path '{1}' already matches the right checksum", complex_data["Target"])
+                return true
             }
         } else {
             this.log.warn("Complex path '{1}' does not exist in destination", complex_data["Path"])
@@ -266,6 +272,8 @@ class Transfer {
         }
 
         ; use the partial path again within class
+        ; modify_count is not reliable here because update will always
+        ; return as true, even if the value is unchanged on disk
         if ! this.__HasLatestContent(complex_data["Path"], ini_config) {
             if this.__AllowAction(complex_data) {
                 this.BackupFile(complex_data)
@@ -276,8 +284,9 @@ class Transfer {
         } else {
             this.log.verb("Ini Config '{1}' already matches the content (format: {2})", complex_data["Path"], format)
 
-            if format
+            if format {
                 ini_config.__FormatIni()
+            }
             return true
         }
     }
@@ -514,7 +523,7 @@ class Transfer {
                 FileMove, % this.dest(old_path), % this.dest(new_path), % overwrite_final
             result := A_LastError
 
-            this.log.verb("[TR] Transferred directory '{1}' to '{2}' (overwrite: {3}) (error: {4})", old_path, new_path, overwrite_final, A_LastError)
+            this.log.verb("[TR] Transferred file '{1}' to '{2}' (overwrite: {3}) (error: {4})", old_path, new_path, overwrite_final, A_LastError)
             return result ? false : true
         } else {
             this.log.err("[TR] Original path '{1}' does not exist", old_path)

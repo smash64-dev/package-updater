@@ -230,9 +230,9 @@ RunPackageProcess() {
     global
 
     local auto_start := OLD_PACKAGE.updater("AutoStart", 0)
+    local package_process := OLD_PACKAGE.path(NEW_PACKAGE.package("Process"))
 
     if (auto_start) {
-        local package_process := OLD_PACKAGE.path(NEW_PACKAGE.package("Process"))
         log.info("Executing new package process: '{1}'", package_process)
 
         if FileExist(package_process) {
@@ -241,7 +241,7 @@ RunPackageProcess() {
             log.err("Package process '{1}' does not exist, not running", package_process)
         }
     } else {
-        log.info("Not executing new package: '{1}', autostart disabled")
+        log.info("Not executing new package: '{1}', autostart disabled", package_process)
     }
 }
 
@@ -253,19 +253,38 @@ UpdatePackage(force := 0) {
     log.info("Preparing to transfer package from '{1}' to '{2}'", NEW_PACKAGE.base_directory, OLD_PACKAGE.base_directory)
 
     if (force) {
+        show_progress := false
         transfer := new Transfer(NEW_PACKAGE.base_directory, OLD_PACKAGE.base_directory)
     } else {
+        show_progress := true
         transfer := new Transfer(NEW_PACKAGE.base_directory, OLD_PACKAGE.base_directory, Func("NotifyCallback"))
+        Show_Update_Progress()
     }
 
     if transfer {
         local complex_paths := new_package.GetComplexPaths()
+        local complex_keys := new_package.GetComplexKeys()
+
+        ; calculate what percent of basic files translates to progress
+        local basic_percent := NEW_PACKAGE.gui("BasicProgress", "0.5")
+        local total_actions := complex_keys.Count() / (1 - basic_percent)
+        local basic_actions := total_actions * basic_percent
         transfer.BasicFiles(complex_paths)
 
-        for complex, action in new_package.GetComplexKeys() {
+        if show_progress {
+            ; yes, we artificially add delays to make the the progress bar look better
+            Show_Update_Progress(basic_actions/total_actions)
+            Sleep 1000
+        }
+
+        for complex, action in complex_keys {
             ; get the complex data, inject the section name into the object
             local complex_data := new_package.main_data[complex]
             complex_data["__SectionName__"] := complex
+
+            if show_progress {
+                Show_Update_Progress((basic_actions + A_Index)/total_actions)
+            }
 
             local result := transfer.ComplexFile(complex_data, action)
             if (result) {
@@ -273,6 +292,10 @@ UpdatePackage(force := 0) {
             } else {
                 log.info("Did not perform '{1}' on '{2}'", action, complex_data["Path"])
             }
+        }
+
+        if show_progress {
+            Show_Update_Progress(-1)
         }
 
         ; runs the package process if autostart is enabled
