@@ -8,7 +8,7 @@
 global AUTHOR := "CEnnis91 © 2020"
 global SELF := "package-updater"
 global SOURCE := "https://github.com/smash64-dev/package-updater"
-global VERSION := "0.9.4"
+global VERSION := "0.10.0"
 
 global APP_DIRECTORY := Format("{1}\{2}", A_AppData, SELF)
 global TEMP_DIRECTORY := Format("{1}\{2}", A_Temp, SELF)

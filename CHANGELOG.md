@@ -1,5 +1,35 @@
 # Changelog
 
+## [0.10.0] - 2020-05-23
+
+### Added
+
+- progress bar to check and update actions
+- menu bar for development/troubleshooting
+- ability to hide and/or toggle menu bar
+- local package update support from menu bar
+- manual backup support from menu bar
+- submit feedback option from menu bar
+- logging to a file and dump logs from menu bar
+- run an external program post update with PostUpdate
+- record update actions for troubleshooting
+
+### Changed
+
+- gui now shows more popups on errors
+- backups can now be tagged
+- download directories and paths are more unique
+- ensure directory is now "present" not "latest"
+- command line options have been adjusted
+- improved logging
+
+### Fixed
+
+- checksums were not checked in some cases
+- ini_config would incorrectly store empty keys
+- unix paths in configs would break transfers
+- TransferLink had an incorrect regex
+
 ## [0.9.4] - 2020-04-28
 
 ### Added
@@ -54,3 +84,4 @@
 [0.9.2]: https://github.com/smash64-dev/package-updater/releases/tag/v0.9.2
 [0.9.3]: https://github.com/smash64-dev/package-updater/releases/tag/v0.9.3
 [0.9.4]: https://github.com/smash64-dev/package-updater/releases/tag/v0.9.4
+[0.10.0]: https://github.com/smash64-dev/package-updater/releases/tag/v0.10.0
