@@ -119,7 +119,7 @@ class GitHub {
             build_tags := build_tags . "`n" . tag_name
         } until !this.json_payload[A_Index].id
 
-        Sort build_tags, CLR
+        Sort build_tags, CLNR
         builds_array := StrSplit(build_tags, "`n")
         latest_tag := builds_array[1]
         latest_build_id := build_list[latest_tag]
