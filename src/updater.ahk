@@ -366,6 +366,9 @@ RunNewPackage() {
 
     log.info("Executing new package updater: '{1} '{2}''", new_updater, old_updater)
     Run %new_updater% "%old_updater%"
+
+    ; mark this as a successful run
+    return true
 }
 
 ; start the package process, pulled from the config

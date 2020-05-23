@@ -262,7 +262,7 @@ class Package {
             return this.main_data[section_name][key_name]
         } else {
             if (optional or StrLen(optional) > 0) {
-                this.log.warn("'{2}' was not found in [{1}], returning '{3}'", section_name, key_name, optional)
+                this.log.verb("'{2}' was not found in [{1}], returning '{3}'", section_name, key_name, optional)
                 return optional
             } else {
                 this.log.err("'{2}' was not found in [{1}], field required", section_name, key_name)
