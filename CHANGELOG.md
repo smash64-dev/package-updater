@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.10.1] - 2020-05-23
+
+### Added
+
+- additional way to trigger menu bar toggle for improved wine support
+
+### Changed
+
+- tweaked logging to be less verbose
+
+### Fixed
+
+- RecordUpdate not recording in_beta properly
+- __GetLatestBuild not sorting semver tags properly
+
 ## [0.10.0] - 2020-05-23
 
 ### Added
@@ -85,3 +100,4 @@
 [0.9.3]: https://github.com/smash64-dev/package-updater/releases/tag/v0.9.3
 [0.9.4]: https://github.com/smash64-dev/package-updater/releases/tag/v0.9.4
 [0.10.0]: https://github.com/smash64-dev/package-updater/releases/tag/v0.10.0
+[0.10.1]: https://github.com/smash64-dev/package-updater/releases/tag/v0.10.1
