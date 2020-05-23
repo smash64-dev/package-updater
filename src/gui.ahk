@@ -275,6 +275,9 @@ Help_Dialog(help_only := 0) {
 Main_Dialog() {
     global
 
+    ; needed for registering the trigger to open the menu bar
+    static double_click_count := 0
+
     local title := Format("{1} — v{2}", SELF ? SELF : "package-updater", VERSION ? VERSION : "0.0.0")
     local exe_path := OLD_PACKAGE.path(OLD_PACKAGE.package("Process"))
 
@@ -296,7 +299,7 @@ Main_Dialog() {
     Gui, Main:Default
     Main_Dialog_MenuBar()
 
-    Gui, Main:Add, Picture, x12 y09 w64 h64 vExeIcon
+    Gui, Main:Add, Picture, x12 y09 w64 h64 vExeIcon gExeIcon
 
     Gui, Main:Font, S12 CDefault Bold, Verdana
     Gui, Main:Add, Text, x92 y09 w470 h20 vHeader
@@ -335,6 +338,20 @@ Main_Dialog() {
     Gui, Main:Show, Center AutoSize, % title
     Gosub, MainButtonCheckForUpdates
     return
+
+    ; register events that occur on the icon
+    ExeIcon:
+        if (A_GuiControlEvent == "DoubleClick") {
+            double_click_count := double_click_count + 1
+
+            ; require 2 double click events before we toggle it
+            ; this should cut down on accidental activation
+            if (double_click_count >= 2) {
+                double_click_count := 0
+                Toggle_Main_Dialog_Menu()
+            }
+        }
+        return
 
     ; check for beta releases, auto refresh if it changes
     MainBeta:
