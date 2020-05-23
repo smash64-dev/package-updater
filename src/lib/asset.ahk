@@ -23,7 +23,7 @@ class Asset {
     }
 
     ; download, validate, and prepare an for usage
-    GetAsset(directory) {
+    GetAsset(directory, tag := "latest") {
         if ! InStr(FileExist(directory), "D") {
             FileCreateDir % directory
             this.log.verb("Created temp directory '{1}' (error: {2})", directory, A_LastError)
@@ -34,7 +34,13 @@ class Asset {
         }
 
         ; download the asset and checksum, then validate it
-        asset_path := this.__DownloadFile(directory, this.asset_url)
+        ; HACK: allows asset_url to be a path instead of a url
+        if (! RegExMatch(this.asset_url, "^http.*$") and FileExist(this.asset_url)) {
+            this.log.warn("Asset_url '{1}' is actually a path", this.asset_url)
+            asset_path := this.asset_url
+        } else {
+            asset_path := this.__DownloadFile(directory, this.asset_url)
+        }
 
         if this.checksum_url
             checksum_path := this.__DownloadFile(directory, this.checksum_url)
@@ -42,7 +48,7 @@ class Asset {
         if this.__ValidateAsset(asset_path, checksum_path, this.checksum_type) {
             if (InStr(this.asset_name, ".zip")) {
                 SplitPath, asset_path,,, asset_ext, asset_name
-                return this.__ExtractZipAsset(asset_path, Format("{1}\{2}-latest", directory, asset_name))
+                return this.__ExtractZipAsset(asset_path, Format("{1}\{2}-{3}", directory, asset_name, tag))
             } else {
                 return asset_path
             }

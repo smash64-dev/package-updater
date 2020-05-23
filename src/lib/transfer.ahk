@@ -487,7 +487,7 @@ class Transfer {
         icon_no := complex_data["IconNumber"] ? complex_data["IconNumber"] : ""
         run_state := complex_data["RunState"] ? complex_data["RunState"] : ""
 
-        if RegExMatch(link_name, "$.*[.]lnk$")
+        if RegExMatch(link_name, "^.*[.]lnk$")
             link_path := this.dest(link_name)
         else
             link_path := Format("{1}.lnk", this.dest(link_name))

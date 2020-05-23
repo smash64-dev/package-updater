@@ -13,11 +13,24 @@ global VERSION := "0.9.4"
 global APP_DIRECTORY := Format("{1}\{2}", A_AppData, SELF)
 global TEMP_DIRECTORY := Format("{1}\{2}", A_Temp, SELF)
 
+; creates a global file handle for this session to write to
+FormatTime, LOG_NOW, , yyyy-MM-dd-HHmmss
+global LOGGER_LOG_FILE := Format("{1}\{2}.log", TEMP_DIRECTORY, LOG_NOW)
+global LOGGER_LOG_FILE_HANDLE := FileOpen(LOGGER_LOG_FILE, "a", 0x200)
+
 ; perform a backup on the old package if the config allows
-BackupOldPackage() {
+BackupOldPackage(tag := "") {
     global
 
-    OLD_PACKAGE.Backup(APP_DIRECTORY, OLD_PACKAGE.updater("Backups", "10"))
+    local backup_directory := Format("{1}\{2}", APP_DIRECTORY, OLD_PACKAGE.package("Name", "unknown"))
+    FileCreateDir % backup_directory
+
+    if InStr(FileExist(backup_directory), "D") {
+        return OLD_PACKAGE.Backup(backup_directory, tag, OLD_PACKAGE.updater("Backups", "10"))
+    } else {
+        log.warn("Unable to create backup, directory '{1}' does not exist", backup_directory)
+        return false
+    }
 }
 
 ; format a version string into v#.#.# format
@@ -30,10 +43,92 @@ CleanVersionString(version_text) {
     clean_text := Format("v{1}.{2}.{3}", SemVer1, SemVer2, SemVer3)
 
     ; minimum string length: v0.0.0 (6)
-    if (StrLen(clean_text) < 6)
+    if (StrLen(clean_text) < 6) {
+        log.warn("Clean version string '{1}' appears invalid", clean_text)
         return false
-    else
+    } else {
         return clean_text
+    }
+}
+
+; creates a log file in TEMP_DIRECTORY for viewing
+DumpLogFiles(log_name := "lastlog.txt") {
+    global
+
+    ; concatenate all the old logs into a single file and open it
+    local log_dump := Format("{1}\{2}", TEMP_DIRECTORY, log_name)
+    local log_format := Format("{1}\*.log", TEMP_DIRECTORY)
+    local log_list := ""
+
+    loop, files, %log_format%
+    {
+        log_list := log_list . "`n" . A_LoopFileFullPath
+    }
+
+    Sort log_list, CL
+    log_list_array := StrSplit(log_list, "`n")
+
+    FileDelete, % log_dump
+    FileAppend, % "", % log_dump
+
+    for index, log_file in log_list_array {
+        if log_file {
+            FileRead, log_file_content, % log_file
+            FileAppend, % Format("{1}`n`n", log_file_content), % log_dump
+        }
+    }
+
+    ; if we have an open log, append it to the dump
+    if log.log_file {
+        FileAppend, % Format("{1}`n`n", log.Dump()), % log_dump
+    }
+
+    ; dump information about the current config
+    local main_config := OLD_PACKAGE.main_ini.GetJSON()
+    local user_config := OLD_PACKAGE.user_ini.GetJSON()
+    FileAppend, % "-----------------------------------`n`n`n", % log_dump
+    FileAppend, % Format("Package Directory: '{1}'`n`n", OLD_PACKAGE.base_directory), % log_dump
+    FileAppend, % Format("Main Config: '{1}'`n`nUser Config: '{2}'`n", main_config, user_config), % log_dump
+
+    return log_dump
+}
+
+; clean up the environment and close out log files before exiting
+ExitClean(final_message := "") {
+    global
+
+    ; clean up old log files, they're text files, we can keep a lot
+    old_log_format := Format("{1}\*.log", TEMP_DIRECTORY)
+    old_log_list := ""
+    old_log_preserve := 25
+
+    loop, files, %old_log_format%
+    {
+        old_log_list := old_log_list . "`n" . A_LoopFileFullPath
+    }
+
+    Sort old_log_list, CLR
+    old_log_array := StrSplit(old_log_list, "`n")
+    old_log_array.RemoveAt(1, old_log_preserve)
+
+    for index, old_log in old_log_array {
+        if old_log {
+            FileDelete, % old_log
+        }
+    }
+
+    ; submit a final log message
+    if final_message {
+        log.crit("===================================")
+        log.crit(final_message)
+        log.crit("===================================")
+    } else {
+        log.crit("===================================")
+    }
+
+    ; exit cleanly
+    LOGGER_LOG_FILE_HANDLE.Close()
+    ExitApp
 }
 
 ; pulls the latest changelog information from github
@@ -41,17 +136,18 @@ CleanVersionString(version_text) {
 GetLatestChangelog() {
     global
 
+    local temp_base := Format("{1}\{2}", TEMP_DIRECTORY, OLD_PACKAGE.package("Name", "unknown"))
     local github_auth := OLD_PACKAGE.updater("ApiAuth", false) ? OLD_PACKAGE.updater("ApiAuth", false) : ""
     local github_api := new GitHub(OLD_PACKAGE.updater("Owner"), OLD_PACKAGE.updater("Repo"), OLD_PACKAGE.updater("Beta", "0"), github_auth)
     local changelog_text := ""
 
-    if github_api.GetReleases(TEMP_DIRECTORY) {
+    if github_api.GetReleases(temp_base) {
         ; gather the changelog data, if any exists
         local changelog_file := OLD_PACKAGE.updater("ChangelogFile")
 
         if changelog_file {
             local changelog_asset := new Asset(changelog_file, github_api.GetFileURL(changelog_file), "", "None")
-            local changelog_path := changelog_asset.GetAsset(TEMP_DIRECTORY)
+            local changelog_path := changelog_asset.GetAsset(temp_base)
 
             if (changelog_path and FileExist(changelog_path)) {
                 FileRead, changelog_text, % changelog_path
@@ -76,23 +172,33 @@ GetLatestChangelog() {
 GetLatestPackage() {
     global
 
+    local temp_base := Format("{1}\{2}", TEMP_DIRECTORY, OLD_PACKAGE.package("Name", "unknown"))
     local github_auth := OLD_PACKAGE.updater("ApiAuth", false) ? OLD_PACKAGE.updater("ApiAuth", false) : ""
     local github_api := new GitHub(OLD_PACKAGE.updater("Owner"), OLD_PACKAGE.updater("Repo"), OLD_PACKAGE.updater("Beta", "0"), github_auth)
 
-    if github_api.GetReleases(TEMP_DIRECTORY) {
+    if github_api.GetReleases(temp_base) {
         local package_file := OLD_PACKAGE.updater("PackageFile")
         local checksum_file := OLD_PACKAGE.updater("ChecksumFile")
         local checksum_type := "SHA1"
 
         if package_file {
             local package_asset := new Asset(package_file, github_api.GetFileURL(package_file), github_api.GetFileURL(checksum_file), checksum_type)
-            local package_path := package_asset.GetAsset(TEMP_DIRECTORY)
+            local package_path := package_asset.GetAsset(temp_base)
 
             if FileExist(package_path) {
                 local new_updater := Format("{1}\{2}", package_path, OLD_PACKAGE.package("Updater", "package-updater.exe"))
 
                 if FileExist(new_updater) {
                     NEW_PACKAGE := new Package(new_updater)
+
+                    ; basic sanity check of the new package
+                    local old_package_config := OLD_PACKAGE.main_ini.GetJSON()
+                    local new_package_config := NEW_PACKAGE.main_ini.GetJSON()
+
+                    ; the package looks invalid, but let the process continue
+                    if (old_package_config != "{}" and new_package_config == "{}") {
+                        log.warn("NEW_PACKAGE '{1}' does not appear to be a valid package", new_package)
+                    }
 
                     local latest_version := github_api.latest_build.tag_name
                     log.info("New version found, tag name '{1}'", latest_version)
@@ -148,9 +254,14 @@ IsCurrentLatest(latest_version) {
 KillPackageProcess() {
     global
 
-    local package_process := OLD_PACKAGE.package("Process")
-    log.info("Killing process from package '{1}'", package_process)
-    Process, Close, % package_process
+    local package_process := OLD_PACKAGE.package("Process", 0)
+
+    if package_process {
+        log.info("Killing process from package '{1}'", package_process)
+        Process, Close, % package_process
+    } else {
+        log.warn("Unable to find process from package '{1}'", package_process)
+    }
 }
 
 ; perform an update without any user interaction
@@ -159,12 +270,17 @@ NonInteractiveUpdate() {
 
     local latest_version := GetLatestPackage()
     if ! IsCurrentLatest(latest_version) {
-        BackupOldPackage()
+        BackupOldPackage("auto")
         KillPackageProcess()
-        RunNewPackage()
+
+        local run_result := RunNewPackage()
+        if ! run_result {
+            ExitClean("There was an error executing the new package")
+        } else {
+            ExitClean()
+        }
     } else {
-        log.crit("There was an issue running the update non-interactively")
-        ExitApp
+        ExitClean("There was an issue running the update non-interactively")
     }
 }
 
@@ -198,10 +314,37 @@ NotifyCallback(complex_data) {
 QuietUpdateCheck() {
     global
 
+    ; FIXME: this doesn't respect or integrate with ExitClean() well
     local latest_version := GetLatestPackage()
+
     if ! IsCurrentLatest(latest_version) {
         Update_Available_Dialog(latest_version)
+    } else {
+        log.info("Package appears to be the latest version '{1}'", latest_version)
     }
+}
+
+; records the update action in the user config for debugging purposes later
+RecordUpdate(update_type := "unknown") {
+    global
+
+    ; record this update action in the user config
+    local record_obj := {}
+    record_obj.in_beta := OLD_PACKAGE.package("Updater", "Beta", "0")
+    record_obj.old_ver := CleanVersionString(OLD_PACKAGE.package("Version", "0.0.0"))
+    record_obj.old_id := OLD_PACKAGE.package("BuildId", "0")
+    record_obj.new_ver := CleanVersionString(NEW_PACKAGE.package("Version", "0.0.0"))
+    record_obj.new_id := NEW_PACKAGE.package("BuildId", "0")
+    record_obj.type := update_type
+
+    ; build a json string and base64 it, to store cleaner
+    local record_json := JSON.Dump(record_obj)
+    local record_base64 := LC_Base64_EncodeText(record_json)
+
+    FormatTime, now, , yyyyMMddHHmmss
+    log.info("Recording update in history: '{1}={2}'", now, record_json)
+    OLD_PACKAGE.UpdateUserProperty("Update_History", now, record_base64)
+    return true
 }
 
 ; transition to the new updater binary to continue the update
@@ -226,7 +369,7 @@ RunNewPackage() {
 }
 
 ; start the package process, pulled from the config
-RunPackageProcess() {
+RunPackageProcess(use_gui := 0) {
     global
 
     local auto_start := OLD_PACKAGE.updater("AutoStart", 0)
@@ -239,9 +382,47 @@ RunPackageProcess() {
             Run %package_process%
         } else {
             log.err("Package process '{1}' does not exist, not running", package_process)
+
+            if use_gui {
+                local fail_title := "Error"
+                local fail_message := Format("Unable to find process '{1}'.", package_process)
+                MsgBox, % (0x10 | 0x2000), % fail_title, % fail_message
+            }
         }
     } else {
         log.info("Not executing new package: '{1}', autostart disabled", package_process)
+    }
+}
+
+; execute an extra, external program after updating
+RunPostUpdate(use_gui := 0) {
+    global
+
+    local post_update := OLD_PACKAGE.path(NEW_PACKAGE.updater("PostUpdate", 0))
+    local version := CleanVersionString(NEW_PACKAGE.package("Version", "0.0.0"))
+
+    if (post_update) {
+        log.info("Executing post update program: '{1}'", post_update)
+
+        if FileExist(post_update) {
+            RunWait %post_update% "%version%"
+
+            if ! ErrorLevel {
+                log.warn("Post update program returned with an error code '{1}'", ErrorLevel)
+            } else {
+                log.info("Post update program returned with no errors")
+            }
+        } else {
+            log.warn("Post update program '{1}' does not exist, not running", post_update)
+
+            if use_gui {
+                local warning_title := "Warning"
+                local warning_message := Format("Unable to find post update program '{1}'.", post_update)
+                MsgBox, % (0x30 | 0x2000), % warning_title, % warning_message
+            }
+        }
+    } else {
+        log.info("No post update program to execute '{1}", post_update)
     }
 }
 
@@ -257,8 +438,9 @@ UpdatePackage(force := 0) {
         transfer := new Transfer(NEW_PACKAGE.base_directory, OLD_PACKAGE.base_directory)
     } else {
         show_progress := true
+        show_progress_title := Format("Updating {1}", NEW_PACKAGE.gui("Name", SELF ? SELF : "package-updater"))
         transfer := new Transfer(NEW_PACKAGE.base_directory, OLD_PACKAGE.base_directory, Func("NotifyCallback"))
-        Show_Update_Progress()
+        Show_Progress(show_progress_title)
     }
 
     if transfer {
@@ -273,7 +455,7 @@ UpdatePackage(force := 0) {
 
         if show_progress {
             ; yes, we artificially add delays to make the the progress bar look better
-            Show_Update_Progress(basic_actions/total_actions)
+            Show_Progress(show_progress_title, basic_actions/total_actions)
             Sleep 1000
         }
 
@@ -283,7 +465,7 @@ UpdatePackage(force := 0) {
             complex_data["__SectionName__"] := complex
 
             if show_progress {
-                Show_Update_Progress((basic_actions + A_Index)/total_actions)
+                Show_Progress(show_progress_title, (basic_actions + A_Index)/total_actions)
             }
 
             local result := transfer.ComplexFile(complex_data, action)
@@ -295,15 +477,23 @@ UpdatePackage(force := 0) {
         }
 
         if show_progress {
-            Show_Update_Progress(-1)
+            Show_Progress(show_progress_title, -3, "Update complete!")
         }
 
+        ; runs an external program post update, if one exists
+        RunPostUpdate(show_progress)
+
         ; runs the package process if autostart is enabled
-        RunPackageProcess()
+        RunPackageProcess(show_progress)
     } else {
-        log.crit("There was an issue creating the transfer object, transfer failed")
+        if show_progress {
+            local fail_title := "Error"
+            local fail_message := Format("There was a problem transferring data.")
+            MsgBox, % (0x10 | 0x2000), % fail_title, % fail_message
+        }
+        ExitClean("There was an issue creating the transfer object, transfer failed")
     }
-    ExitApp
+    ExitClean()
 }
 
 ; entry point
@@ -349,6 +539,7 @@ switch A_Args[1] {
         log.info("Updating self package")
         global OLD_PACKAGE := new Package(A_ScriptFullPath)
         global NEW_PACKAGE := new Package(A_ScriptFullPath)
+        RecordUpdate("self-auto")
         UpdatePackage(1)
 
     ; run a self update, this applies the config to yourself
@@ -357,6 +548,7 @@ switch A_Args[1] {
         log.info("Updating self package")
         global OLD_PACKAGE := new Package(A_ScriptFullPath)
         global NEW_PACKAGE := new Package(A_ScriptFullPath)
+        RecordUpdate("self-user")
         UpdatePackage(0)
 
     ; display version information
@@ -365,25 +557,26 @@ switch A_Args[1] {
         About_Dialog(1)
 
     default:
-		if FileExist(A_Args[1]) {
-			; execute phase 2 of the update process
-			log.info("Executing phase 2 of the update process")
-			global OLD_PACKAGE := new Package(A_Args[1])
+        if FileExist(A_Args[1]) {
+            ; execute phase 2 of the update process
+            log.info("Executing phase 2 of the update process")
+            global OLD_PACKAGE := new Package(A_Args[1])
 
             ; load OLD_PACKAGE user config into NEW_PACKAGE
             ; we have to transfer both user_config_path and user_ini
-			global NEW_PACKAGE := new Package(A_ScriptFullPath)
+            global NEW_PACKAGE := new Package(A_ScriptFullPath)
             NEW_PACKAGE.user_config_path := OLD_PACKAGE.user_config_path
             NEW_PACKAGE.user_ini := OLD_PACKAGE.user_ini
             NEW_PACKAGE.ReloadConfigFromDisk(1)
 
-			UpdatePackage(0)
-		} else {
-			; standard update process, launch update dialog first
-			log.info("Executing phase 1 of the update process")
-			global OLD_PACKAGE := new Package(A_ScriptFullPath)
-			Main_Dialog()
-		}
+            RecordUpdate("user")
+            UpdatePackage(0)
+        } else {
+            ; standard update process, launch update dialog first
+            log.info("Executing phase 1 of the update process")
+            global OLD_PACKAGE := new Package(A_ScriptFullPath)
+            Main_Dialog()
+        }
 }
 
 exit

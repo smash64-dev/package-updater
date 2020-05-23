@@ -44,18 +44,24 @@ class Package {
     }
 
     ; backs up package to a directory, with the option to trim old backups
-    Backup(directory, keep_old := 0) {
+    Backup(directory, tag := "", keep_old := 0) {
         FormatTime, now,, yyyy-MM-dd-HHmmss
-        backup_zip := Format("{1}\backup-{2}-{3}.zip", directory, this.__GetSectionValue("Package", "Name"), now)
+
+        if (tag != "" and ! RegexMatch(tag, "^[-].*$")) {
+            tag := Format("-{1}", tag)
+        }
+        backup_zip := Format("{1}\backup{2}-{3}.zip", directory, tag, now)
 
         this.log.info("Backing up '{1}' to '{2}'", this.base_directory, backup_zip)
         Zip(this.base_directory, backup_zip)
 
         ; trim old backups if specified
         if (keep_old > 0) {
+            backup_format := Format("{1}\backup{2}*.zip", directory, tag)
             backup_list := ""
 
-            loop %save_dir%\*.*
+            ; find other backups with the same tag
+            loop, files, %backup_format%
             {
                 backup_list := backup_list . "`n" . A_LoopFileName
             }
@@ -71,6 +77,8 @@ class Package {
                 }
             }
         }
+
+        return backup_zip
     }
 
     ; returns an object of special keys
@@ -192,7 +200,11 @@ class Package {
             return false
         }
 
-        if (JSON.Load(this.main_ini.original_data)[section_name][key_name]) {
+        key_exists := JSON.Load(this.main_ini.original_data)[section_name].HasKey(key_name)
+        key_value := JSON.Load(this.main_ini.original_data)[section_name][key_name]
+
+        ; if the key exists but is empty, it doesn't count, but key=0 does count
+        if ((key_exists and key_value != "") or key_value) {
             this.log.warn("Cannot update user property '{1}.{2}' exists in main config", section_name, key_name)
             return false
         }
