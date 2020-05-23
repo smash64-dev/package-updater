@@ -330,7 +330,7 @@ RecordUpdate(update_type := "unknown") {
 
     ; record this update action in the user config
     local record_obj := {}
-    record_obj.in_beta := OLD_PACKAGE.package("Updater", "Beta", "0")
+    record_obj.in_beta := OLD_PACKAGE.updater("Beta", "0")
     record_obj.old_ver := CleanVersionString(OLD_PACKAGE.package("Version", "0.0.0"))
     record_obj.old_id := OLD_PACKAGE.package("BuildId", "0")
     record_obj.new_ver := CleanVersionString(NEW_PACKAGE.package("Version", "0.0.0"))
