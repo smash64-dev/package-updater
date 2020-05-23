@@ -45,7 +45,7 @@ TestGithub() {
     assert("Latest package URL exists", ! package_url)
     assert("Latest checksum URL exists", ! checksum_url)
 
-	asset := new Asset(Format("{1}.zip", gh_repo), package_url, checksum_url, "SHA1")
+    asset := new Asset(Format("{1}.zip", gh_repo), package_url, checksum_url, "SHA1")
 
     ; test the internal methods individually
     asset_path := asset.__DownloadFile(TEMP_DIRECTORY, asset.asset_url)
@@ -57,7 +57,7 @@ TestGithub() {
 
     ; test the primary all-in-one method
     FileRemoveDir, % TEMP_DIRECTORY, 1
-	asset_location := asset.GetAsset(TEMP_DIRECTORY)
+    asset_location := asset.GetAsset(TEMP_DIRECTORY, "test")
     assert("Get and validate asset data", (! asset_location or ! FileExist(asset_location)))
 
     return true
@@ -217,9 +217,9 @@ TestTransfer() {
 
     ; perform the complex transfer
     for complex, action in package.GetComplexKeys() {
-	    complex_data := package.main_data[complex]
-		result := transfer.ComplexFile(complex_data, action)
-	}
+        complex_data := package.main_data[complex]
+        result := transfer.ComplexFile(complex_data, action)
+    }
 
     ; test ensure absent file and directory
     assert("Remove 'ensure absent file.txt'", FileExist(transfer.dest("ensure absent file.txt")))
