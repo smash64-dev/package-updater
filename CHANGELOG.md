@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.10.2] - 2021-04-07
+
+### Changed
+
+- improved latest version detection
+
 ## [0.10.1] - 2020-05-23
 
 ### Added
@@ -101,3 +107,4 @@
 [0.9.4]: https://github.com/smash64-dev/package-updater/releases/tag/v0.9.4
 [0.10.0]: https://github.com/smash64-dev/package-updater/releases/tag/v0.10.0
 [0.10.1]: https://github.com/smash64-dev/package-updater/releases/tag/v0.10.1
+[0.10.2]: https://github.com/smash64-dev/package-updater/releases/tag/v0.10.2
