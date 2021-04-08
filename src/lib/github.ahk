@@ -121,7 +121,14 @@ class GitHub {
 
         Sort build_tags, CLNR
         builds_array := StrSplit(build_tags, "`n")
+
         latest_tag := builds_array[1]
+        loop {
+            if builds_array[A_Index] != "" {
+                latest_tag := builds_array[A_Index]
+                break
+            }
+        } until A_Index = builds_array.Length()
         latest_build_id := build_list[latest_tag]
 
         if this.json_payload.HasKey(latest_build_id) {
