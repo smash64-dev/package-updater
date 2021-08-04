@@ -8,7 +8,7 @@
 global AUTHOR := "CEnnis91 © 2021"
 global SELF := "package-updater"
 global SOURCE := "https://github.com/smash64-dev/package-updater"
-global VERSION := "0.10.2"
+global VERSION := "1.0.4"
 
 global APP_DIRECTORY := Format("{1}\{2}", A_AppData, SELF)
 global TEMP_DIRECTORY := Format("{1}\{2}", A_Temp, SELF)
@@ -259,9 +259,35 @@ KillPackageProcess() {
     if package_process {
         log.info("Killing process from package '{1}'", package_process)
         Process, Close, % package_process
+
+        if ! ErrorLevel {
+            ; HACK: attempt to find a process using the window list too
+            ; this can probably be better/faster, but it's reliable enough for now
+            local win_killed := false
+            WinGet, self_pid, PID, %A_ScriptFullPath%
+
+            WinGet win_list, List
+            loop %win_list%
+            {
+                win_id := win_list%A_Index%
+                WinGet process_name, ProcessName, ahk_id %win_id%
+
+                if (process_name == package_process) {
+                    WinGet pid, PID, ahk_id %win_id%
+
+                    ; use WinKill if it's not self, assume success
+                    if (pid != self_pid) {
+                        WinKill, ahk_pid %pid%
+                        win_killed := true
+                    }
+                }
+            }
+            return win_killed
+        }
     } else {
         log.warn("Unable to find process from package '{1}'", package_process)
     }
+    return true
 }
 
 ; perform an update without any user interaction
@@ -314,11 +340,13 @@ NotifyCallback(complex_data) {
 QuietUpdateCheck() {
     global
 
-    ; FIXME: this doesn't respect or integrate with ExitClean() well
     local latest_version := GetLatestPackage()
-
     if ! IsCurrentLatest(latest_version) {
-        Update_Available_Dialog(latest_version)
+        local do_update := Update_Available_Dialog(latest_version)
+
+        if ! do_update {
+            ExitClean()
+        }
     } else {
         log.info("Package appears to be the latest version '{1}'", latest_version)
     }
@@ -564,6 +592,7 @@ switch A_Args[1] {
             ; execute phase 2 of the update process
             log.info("Executing phase 2 of the update process")
             global OLD_PACKAGE := new Package(A_Args[1])
+            KillPackageProcess()
 
             ; load OLD_PACKAGE user config into NEW_PACKAGE
             ; we have to transfer both user_config_path and user_ini

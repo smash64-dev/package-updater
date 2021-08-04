@@ -261,7 +261,7 @@ Help_Dialog(help_only := 0) {
     local cmd_noni := Format("    -n, --non-interactive: Runs a non-interactive update")
     local cmd_self := Format("    -s, --self-quiet: Updates self non-interactively`n    --self-update: Updates self interactively")
     local cmd_version := Format("    -v, --version: Displays an about dialog")
-    local cmd_default := Format("Running {1} without arguments will run a normal update process with a dialog and interactive options.", A_ScriptName)
+    local cmd_default := Format("Running {1} without arguments will run a normal update process with a dialog and interactive options.`n`n", A_ScriptName)
 
     local cmdline_description := Format("{1}`n{2}`n{3}`n{4}`n{5}`n`n{6}", cmd_check, cmd_help, cmd_noni, cmd_self, cmd_version, cmd_default)
     MsgBox, % (0x40 | 0x2000), % title, % Format("{1}`n{2}`n`n{3}", version_text, cmdline_text, cmdline_description)
@@ -617,7 +617,14 @@ Run_Update(rerun := 0) {
     ; do not show any progress bar here because we're about to exit
     Hotkey, !^+d, Toggle_Main_Dialog_Menu, Off
     BackupOldPackage("auto")
-    KillPackageProcess()
+
+    local kill_result := KillPackageProcess()
+    if ! kill_result {
+        local package_process := OLD_PACKAGE.package("Process", 0)
+        local warn_title := "Package Update"
+        local warn_message := Format("Unable to determine if {1} was closed.`n`nPlease make sure it is closed then click 'OK'.", package_process)
+        MsgBox, % (0x10 | 0x30 | 0x2000), % warn_title, % warn_message
+    }
 
     local run_result := RunNewPackage()
     if ! run_result {
@@ -639,8 +646,8 @@ Show_Progress(title := "", percentage := 0, force_message := "") {
     static message_cycle := 3
 
     ; how much padding we add when positioning the window
-    local padding_x := 2
-    local padding_y := 2
+    local padding_x := 5
+    local padding_y := 5
 
     local window_title := title ? title : NEW_PACKAGE.gui("Name", SELF ? SELF : "package-updater")
     local default_messages := "Please wait;This will only take a few seconds"
@@ -661,8 +668,8 @@ Show_Progress(title := "", percentage := 0, force_message := "") {
         }
     }
 
-    local window_message := Format("{1}...", force_message ? force_message : progress_message)
-    window_message := force_message ? force_message : window_message
+    local window_message := Format("`n     {1}     `n", force_message ? force_message : progress_message . "...")
+    ;window_message := force_message ? force_message : window_message
 
     ; adjust percentage if we sent a fraction < 1
     if (percentage > 0 and percentage <= 1) {
@@ -725,7 +732,10 @@ Toggle_Main_Dialog_Menu(force := -1) {
 Update_Available_Dialog(latest_version) {
     global
 
-    local update_title := Format("{1} — v{2}", SELF ? SELF : "package-updater", VERSION ? VERSION : "0.0.0")
+    local package_name := OLD_PACKAGE.gui("Name", SELF ? SELF : "package-updater")
+    local package_version := OLD_PACKAGE.package("Version", VERSION ? VERSION : "0.0.0")
+    local update_title := Format("{1} — v{2}", package_name ? package_name : "package-updater", package_version ? package_version : "0.0.0")
+
     local base_text := Format("A new version is available ({1}), update now?", latest_version)
     local custom_text := NEW_PACKAGE.gui("UpdateAvailable", OLD_PACKAGE.gui("UpdateAvailable", false))
 
@@ -740,9 +750,16 @@ Update_Available_Dialog(latest_version) {
         update_text := base_text
     }
 
+    update_text := StrReplace(update_text, "\n", "`n")
     MsgBox, % (0x4 | 0x30 | 0x100 | 0x2000), % update_title, % update_text
     IfMsgBox, Yes
+    {
         Main_Dialog()
+        return true
+    }
     IfMsgBox, No
+    {
         ExitClean()
+        return false
+    }
 }
