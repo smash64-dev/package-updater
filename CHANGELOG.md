@@ -1,5 +1,20 @@
 # Changelog
 
+## [1.0.5] - 2021-08-12
+
+### Added
+
+- last update check to update_history
+
+### Changed
+
+- bumped version to 1.x.x
+- tweaked check for update
+
+### Fixed
+
+- fixed issue where the updater wouldn't kill the process properly
+
 ## [0.10.2] - 2021-04-07
 
 ### Changed
@@ -108,3 +123,4 @@
 [0.10.0]: https://github.com/smash64-dev/package-updater/releases/tag/v0.10.0
 [0.10.1]: https://github.com/smash64-dev/package-updater/releases/tag/v0.10.1
 [0.10.2]: https://github.com/smash64-dev/package-updater/releases/tag/v0.10.2
+[1.0.5]: https://github.com/smash64-dev/package-updater/releases/tag/v1.0.5

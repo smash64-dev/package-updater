@@ -8,7 +8,7 @@
 global AUTHOR := "CEnnis91 © 2021"
 global SELF := "package-updater"
 global SOURCE := "https://github.com/smash64-dev/package-updater"
-global VERSION := "1.0.4"
+global VERSION := "1.0.5"
 
 global APP_DIRECTORY := Format("{1}\{2}", A_AppData, SELF)
 global TEMP_DIRECTORY := Format("{1}\{2}", A_Temp, SELF)
@@ -200,6 +200,10 @@ GetLatestPackage() {
                         log.warn("NEW_PACKAGE '{1}' does not appear to be a valid package", new_package)
                     }
 
+                    local now_epoch := GetSystemTimeAsUnixTime()
+                    log.info("Recording successfull update check in history: '{1}'", now_epoch)
+                    OLD_PACKAGE.UpdateUserProperty("Update_History", "LastUpdateCheck", now_epoch)
+
                     local latest_version := github_api.latest_build.tag_name
                     log.info("New version found, tag name '{1}'", latest_version)
                     return latest_version
@@ -217,6 +221,16 @@ GetLatestPackage() {
     }
 
     return false
+}
+
+; returns the system time as unix time, reduces to seconds
+GetSystemTimeAsUnixTime() {
+    ; January 1, 1970 (start of Unix epoch) in "ticks"
+    static UNIX_TIME_START := 0x019DB1DED53E8000
+    static TICKS_PER_SECOND := 10000000
+
+    DllCall("GetSystemTimeAsFileTime", "Int64*", UTC_Ticks)
+    Return Floor((UTC_Ticks - UNIX_TIME_START) / TICKS_PER_SECOND)
 }
 
 ; determine if the current version is different from the latest version

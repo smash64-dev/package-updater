@@ -751,7 +751,7 @@ Update_Available_Dialog(latest_version) {
     }
 
     update_text := StrReplace(update_text, "\n", "`n")
-    MsgBox, % (0x4 | 0x30 | 0x100 | 0x2000), % update_title, % update_text
+    MsgBox, % (0x4 | 0x30 | 0x100 | 0x1000), % update_title, % update_text
     IfMsgBox, Yes
     {
         Main_Dialog()
