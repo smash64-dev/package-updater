@@ -1,6 +1,6 @@
 # Changelog
 
-## [1.0.5] - 2021-08-12
+## [v1.0.5] - 2021-08-12
 
 ### Added
 
@@ -15,13 +15,13 @@
 
 - fixed issue where the updater wouldn't kill the process properly
 
-## [0.10.2] - 2021-04-07
+## [v0.10.2] - 2021-04-07
 
 ### Changed
 
 - improved latest version detection
 
-## [0.10.1] - 2020-05-23
+## [v0.10.1] - 2020-05-23
 
 ### Added
 
@@ -36,7 +36,7 @@
 - RecordUpdate not recording in_beta properly
 - __GetLatestBuild not sorting semver tags properly
 
-## [0.10.0] - 2020-05-23
+## [v0.10.0] - 2020-05-23
 
 ### Added
 
@@ -66,7 +66,7 @@
 - unix paths in configs would break transfers
 - TransferLink had an incorrect regex
 
-## [0.9.4] - 2020-04-28
+## [v0.9.4] - 2020-04-28
 
 ### Added
 
@@ -77,7 +77,7 @@
 - autostart does not work when package Process changes
 - updater freezes when toggling beta flag mid-update check
 
-## [0.9.3] - 2020-04-21
+## [v0.9.3] - 2020-04-21
 
 ### Added
 
@@ -91,7 +91,7 @@
 
 - user override config not being protected during transfer
 
-## [0.9.2] - 2020-04-21
+## [v0.9.2] - 2020-04-21
 
 ### Changed
 
@@ -102,7 +102,7 @@
 
 - incorrect version number
 
-## [0.9.1] - 2020-04-21
+## [v0.9.1] - 2020-04-21
 
 ### Fixed
 
@@ -111,16 +111,16 @@
 - close the updater after transitioning to phase 2
 - minor version strings
 
-## [0.9.0] - 2020-04-20
+## [v0.9.0] - 2020-04-20
 
 - Initial beta release
 
-[0.9.0]: https://github.com/smash64-dev/package-updater/releases/tag/v0.9.0
-[0.9.1]: https://github.com/smash64-dev/package-updater/releases/tag/v0.9.1
-[0.9.2]: https://github.com/smash64-dev/package-updater/releases/tag/v0.9.2
-[0.9.3]: https://github.com/smash64-dev/package-updater/releases/tag/v0.9.3
-[0.9.4]: https://github.com/smash64-dev/package-updater/releases/tag/v0.9.4
-[0.10.0]: https://github.com/smash64-dev/package-updater/releases/tag/v0.10.0
-[0.10.1]: https://github.com/smash64-dev/package-updater/releases/tag/v0.10.1
-[0.10.2]: https://github.com/smash64-dev/package-updater/releases/tag/v0.10.2
-[1.0.5]: https://github.com/smash64-dev/package-updater/releases/tag/v1.0.5
+[v0.9.0]: https://github.com/smash64-dev/package-updater/releases/tag/v0.9.0
+[v0.9.1]: https://github.com/smash64-dev/package-updater/releases/tag/v0.9.1
+[v0.9.2]: https://github.com/smash64-dev/package-updater/releases/tag/v0.9.2
+[v0.9.3]: https://github.com/smash64-dev/package-updater/releases/tag/v0.9.3
+[v0.9.4]: https://github.com/smash64-dev/package-updater/releases/tag/v0.9.4
+[v0.10.0]: https://github.com/smash64-dev/package-updater/releases/tag/v0.10.0
+[v0.10.1]: https://github.com/smash64-dev/package-updater/releases/tag/v0.10.1
+[v0.10.2]: https://github.com/smash64-dev/package-updater/releases/tag/v0.10.2
+[v1.0.5]: https://github.com/smash64-dev/package-updater/releases/tag/v1.0.5
