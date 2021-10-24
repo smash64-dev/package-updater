@@ -15,14 +15,13 @@ jobs:
         shell: bash
         run: |
           TAG="${GITHUB_REF##*/}"
-
-          if [[ -z "$(grep "^## .*${TAG}" CHANGELOG.md)" ]]; then
+          if [[ -z "$(grep "^## .*${TAG}" "CHANGELOG.md")" ]]; then
             echo "::error ::Could not find ${TAG} in CHANGELOG.md, release halted."
             exit 1
           fi
 
           mkdir -p build
-          sed -n "/^## .*${TAG}/,/^## /{//b;p}" CHANGELOG.md | sed -e :a -e '/./,$!d;/^\n*$/{$d;N;};/\n$/ba > build/RELEASE.md
+          sed -n "/^## .*${TAG}/,/^## /{//b;p}" CHANGELOG.md | sed -e :a -e '/./,$!d;/^\n*$/{$d;N;};/\n$/ba' > build/RELEASE.md
 
       - name: Compile Updater
         id: ahk2exe
