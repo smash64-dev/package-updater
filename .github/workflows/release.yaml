@@ -48,4 +48,4 @@ jobs:
             build/package-updater.zip
             build/sha1sum.txt
             CHANGELOG.md
-            src/package-updater.exe
+            ${{ steps.ahk2exe.outputs.binary }}
