@@ -42,7 +42,7 @@ jobs:
         uses: softprops/action-gh-release@v1
         if: startsWith(github.ref, 'refs/tags/')
         with:
-          body: build/RELEASE.md
+          body_path: build/RELEASE.md
           draft: true
           files: |
             build/package-updater.zip

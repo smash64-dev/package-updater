@@ -1,4 +1,7 @@
 # git archive
+.github export-ignore
+.gitattributes export-ignore
+.gitignore export-ignore
 conf/example.cfg export-subst
 src/package-updater.exe export-ignore
 src/updater.cfg export-subst
