@@ -45,8 +45,8 @@ jobs:
         uses: actions/upload-artifact@v3
         if: "!startsWith(github.ref, 'refs/tags/')"
         with:
-          name: package
-          path: build/package-updater.zip
+          name: binary
+          path: ${{ steps.ahk2exe.outputs.binary }}
 
       - name: Release
         uses: softprops/action-gh-release@v1
