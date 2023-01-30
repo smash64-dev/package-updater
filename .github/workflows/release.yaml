@@ -37,6 +37,7 @@ jobs:
       - name: Archive Package
         shell: bash
         run: |
+          mkdir -p build
           git archive --format=zip --output="build/${GITHUB_REPOSITORY##*/}.zip" HEAD
           (cd "build" && sha1sum "${GITHUB_REPOSITORY##*/}.zip" > sha1sum.txt)
 
