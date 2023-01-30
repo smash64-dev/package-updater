@@ -73,7 +73,13 @@ class GitHub {
 
         release_json := Format("{1}\{2}-{3}.json", directory, this.github_owner, this.github_repo)
         FileDelete, % release_json
-        this.__DownloadToFile(this.release_url, release_json)
+
+        if A_OSVersion in WIN_VISTA,WIN_7
+        {
+            this.__DownloadToFileLegacy(this.release_url, release_json)
+        } else {
+            this.__DownloadToFile(this.release_url, release_json)
+        }
         result := A_LastError
 
         if ! A_LastError {
@@ -104,6 +110,25 @@ class GitHub {
             return true
         } else {
             this.log.warn("{1} {2} - {3}", whr.Status, whr.StatusText, whr.ResponseText)
+            return false
+        }
+    }
+
+    __DownloadToFileLegacy(url, path) {
+        local req := ComObjCreate("Msxml2.XMLHTTP")
+        req.Open("GET", url, false)
+
+        if this.basic_auth {
+            this.log.info("Basic authorization found, adding header")
+            whr.SetRequestHeader("Authorization", Format("Basic {1}", this.basic_auth))
+        }
+        req.Send()
+
+        FileAppend, % req.responseText, % path
+        if req.status == "200" {
+            return true
+        } else {
+            this.log.warn("{1} {2} - {3}", req.status, req.statusText, req.responseText)
             return false
         }
     }

@@ -363,6 +363,7 @@ QuietUpdateCheck() {
         }
     } else {
         log.info("Package appears to be the latest version '{1}'", latest_version)
+        ExitClean()
     }
 }
 

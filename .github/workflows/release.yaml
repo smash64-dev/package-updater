@@ -3,6 +3,7 @@ on:
   push:
     tags:
       - 'v*.*.*'
+  workflow_dispatch:
 
 jobs:
   Release:
@@ -37,6 +38,13 @@ jobs:
         run: |
           git archive --format=zip --output="build/${GITHUB_REPOSITORY##*/}.zip" HEAD
           (cd "build" && sha1sum "${GITHUB_REPOSITORY##*/}.zip" > sha1sum.txt)
+
+      - name: Artifact
+        uses: actions/upload-artifact@v3
+        if: "!startsWith(github.ref, 'refs/tags/')"
+        with:
+          name: package
+          path: build/package-updater.zip
 
       - name: Release
         uses: softprops/action-gh-release@v1
