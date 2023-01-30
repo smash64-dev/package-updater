@@ -1,5 +1,12 @@
 # Changelog
 
+## [v1.1.0] - 2023-01-30
+
+### Fixed
+
+- package-updater closes itself after quietly checking for an update
+- potential fix for WinHttp.WinHttpRequest crash on Windows 7
+
 ## [v1.0.5] - 2021-08-12
 
 ### Added

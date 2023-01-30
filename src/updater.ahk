@@ -5,10 +5,10 @@
 
 #Include %A_LineFile%\..\include.ahk
 
-global AUTHOR := "CEnnis91 © 2021"
+global AUTHOR := "CEnnis91 © 2023"
 global SELF := "package-updater"
 global SOURCE := "https://github.com/smash64-dev/package-updater"
-global VERSION := "1.0.5"
+global VERSION := "1.1.0"
 
 global APP_DIRECTORY := Format("{1}\{2}", A_AppData, SELF)
 global TEMP_DIRECTORY := Format("{1}\{2}", A_Temp, SELF)
