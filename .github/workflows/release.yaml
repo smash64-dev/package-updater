@@ -46,7 +46,7 @@ jobs:
         if: "!startsWith(github.ref, 'refs/tags/')"
         with:
           name: binary
-          path: ${{ steps.ahk2exe.outputs.binary }}
+          path: src/package-updater.exe
 
       - name: Release
         uses: softprops/action-gh-release@v1
