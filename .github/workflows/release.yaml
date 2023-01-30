@@ -14,6 +14,7 @@ jobs:
 
       - name: Ensure Changelog
         shell: bash
+        if: "!startsWith(github.ref, 'refs/tags/')"
         run: |
           TAG="${GITHUB_REF##*/}"
           if [[ -z "$(grep "^## .*${TAG}" "CHANGELOG.md")" ]]; then
