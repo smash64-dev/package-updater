@@ -29,6 +29,7 @@ jobs:
         id: ahk2exe
         uses: cennis91/action-ahk2exe@main
         with:
+          base: Unicode 32-bit.bin
           in: src/updater.ahk
           out: src/package-updater.exe
           icon: res/icon.ico
